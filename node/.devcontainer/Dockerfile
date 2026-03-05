@@ -3,7 +3,7 @@ FROM node:20
 ARG TZ
 ENV TZ="$TZ"
 
-# Essential system tools
+# Essential system tools + Playwright/Chromium dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
   less \
   git \
@@ -15,6 +15,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   nano \
   ca-certificates \
   curl \
+  # Playwright/Chromium dependencies
+  libnss3 \
+  libatk1.0-0 \
+  libatk-bridge2.0-0 \
+  libcups2 \
+  libdrm2 \
+  libxkbcommon0 \
+  libxcomposite1 \
+  libxdamage1 \
+  libxfixes3 \
+  libxrandr2 \
+  libgbm1 \
+  libpango-1.0-0 \
+  libcairo2 \
+  libasound2 \
+  libatspi2.0-0 \
+  libxshmfence1 \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Docker CLI (uses host's Docker via socket)
@@ -31,6 +48,10 @@ ARG USERNAME=node
 RUN mkdir -p /usr/local/share/npm-global && \
   chown -R $USERNAME:$USERNAME /usr/local/share && \
   groupadd -f docker && usermod -aG docker $USERNAME
+
+# Allow node user to use sudo without password
+RUN echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/$USERNAME \
+  && chmod 0440 /etc/sudoers.d/$USERNAME
 
 # Persist shell history
 RUN mkdir /commandhistory && \
