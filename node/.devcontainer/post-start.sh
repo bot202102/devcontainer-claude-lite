@@ -16,4 +16,4 @@ if [ -d "$HOME/.gitconfig" ]; then
 fi
 
 # Bind-mounted workspaces may have different uid — mark as safe
-git config --global --add safe.directory /workspace 2>/dev/null || true
+git config --global safe.directory /workspace 2>/dev/null || true

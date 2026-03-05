@@ -15,6 +15,13 @@
 # IMPORTANT: requirements.txt is installed at build time (in the Dockerfile)
 # so ALL services (app, workers, etc.) get the Python dependencies.
 # postCreateCommand re-runs pip install for dev updates on the main service.
+#
+# PORT CONFLICTS: If you run multiple devcontainers simultaneously, use unique
+# port ranges per project via env vars. Example in .env:
+#   POSTGRES_PORT=31432
+#   REDIS_PORT=31379
+# Default ports (5432, 6379, etc.) WILL conflict with other containers and can
+# cause silent network failures (container starts but has no internet).
 # =============================================================================
 
 services:
@@ -31,6 +38,13 @@ services:
       - claude-lite-config:/home/dev/.claude
       - /var/run/docker.sock:/var/run/docker.sock
     command: sleep infinity
+    # Detect network loss early (port conflicts cause silent disconnects)
+    healthcheck:
+      test: ["CMD-SHELL", "getent hosts google.com > /dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     # depends_on:
     #   postgres:
     #     condition: service_healthy
@@ -61,6 +75,8 @@ services:
 
   ## ---------------------------------------------------------
   ## PostgreSQL — uncomment to enable
+  ## Use pgvector/pgvector:pg16 if your app needs vector search
+  ## (required by Chatwoot, Supabase, and many AI/RAG apps)
   ## ---------------------------------------------------------
   # postgres:
   #   image: postgres:16-alpine
@@ -72,7 +88,7 @@ services:
   #   volumes:
   #     - pgdata:/var/lib/postgresql/data
   #   ports:
-  #     - "5432:5432"
+  #     - "${POSTGRES_PORT:-5432}:5432"
   #   healthcheck:
   #     test: ["CMD-SHELL", "pg_isready -U devuser -d devdb"]
   #     interval: 5s
@@ -89,7 +105,7 @@ services:
   #   volumes:
   #     - redisdata:/data
   #   ports:
-  #     - "6379:6379"
+  #     - "${REDIS_PORT:-6379}:6379"
   #   healthcheck:
   #     test: ["CMD", "redis-cli", "-a", "devpass", "ping"]
   #     interval: 5s
@@ -110,7 +126,7 @@ services:
   #   volumes:
   #     - mysqldata:/var/lib/mysql
   #   ports:
-  #     - "3306:3306"
+  #     - "${MYSQL_PORT:-3306}:3306"
   #   healthcheck:
   #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "devuser", "-pdevpass"]
   #     interval: 5s
@@ -129,7 +145,7 @@ services:
   #   volumes:
   #     - mongodata:/data/db
   #   ports:
-  #     - "27017:27017"
+  #     - "${MONGO_PORT:-27017}:27017"
 
   ## ---------------------------------------------------------
   ## Jaeger (OpenTelemetry traces) — uncomment to enable
@@ -140,8 +156,8 @@ services:
   #   environment:
   #     COLLECTOR_OTLP_ENABLED: "true"
   #   ports:
-  #     - "16686:16686"   # UI
-  #     - "4318:4318"     # OTLP HTTP
+  #     - "${JAEGER_UI_PORT:-16686}:16686"   # UI
+  #     - "${JAEGER_OTLP_PORT:-4318}:4318"   # OTLP HTTP
 
 volumes:
   claude-lite-history:
