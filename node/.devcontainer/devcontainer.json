@@ -16,6 +16,24 @@
         "terminal.integrated.defaultProfile.linux": "zsh",
         "terminal.integrated.profiles.linux": {
           "zsh": { "path": "zsh" }
+        },
+        "files.watcherExclude": {
+          "**/node_modules/**": true,
+          "**/.git/objects/**": true,
+          "**/.git/subtree-cache/**": true,
+          "**/dist/**": true,
+          "**/build/**": true,
+          "**/.next/**": true,
+          "**/.turbo/**": true
+        },
+        "search.exclude": {
+          "**/node_modules": true,
+          "**/dist": true,
+          "**/build": true,
+          "**/.next": true,
+          "**/.turbo": true,
+          "pnpm-lock.yaml": true,
+          "package-lock.json": true
         }
       }
     }
@@ -31,5 +49,29 @@
     "CLAUDE_CONFIG_DIR": "/home/node/.claude"
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
-  "workspaceFolder": "/workspace"
+  "workspaceFolder": "/workspace",
+
+  // -----------------------------------------------------------
+  // OPTIONAL: Uncomment to use docker-compose with services
+  // -----------------------------------------------------------
+  // "dockerComposeFile": "docker-compose.yml",
+  // "service": "app",
+  // "shutdownAction": "stopCompose",
+  //
+  // Port forwarding (adjust to your services):
+  // "forwardPorts": [3000, 5173, 5432, 6379],
+  // "portsAttributes": {
+  //   "3000": { "label": "Backend", "onAutoForward": "notify" },
+  //   "5173": { "label": "Frontend", "onAutoForward": "notify" },
+  //   "5432": { "label": "PostgreSQL", "onAutoForward": "silent" },
+  //   "6379": { "label": "Redis", "onAutoForward": "silent" }
+  // },
+  //
+  // Service env vars (container-to-container DNS):
+  // "remoteEnv": {
+  //   "DATABASE_URL": "postgresql://user:pass@postgres:5432/mydb",
+  //   "REDIS_URL": "redis://:pass@redis:6379"
+  // },
+
+  "postCreateCommand": "if [ -f package.json ]; then npm install; fi"
 }
