@@ -101,6 +101,9 @@ RUN echo 'export HISTFILE=/commandhistory/.zsh_history' >> ~/.zshrc && \
   echo 'autoload -Uz compinit && compinit' >> ~/.zshrc && \
   echo 'PROMPT="%F{blue}%~%f %# "' >> ~/.zshrc
 
+# pnpm via corepack (available if project uses pnpm-lock.yaml)
+RUN corepack enable
+
 # Claude Code
 ARG CLAUDE_CODE_VERSION=latest
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}

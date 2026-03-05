@@ -48,6 +48,8 @@
     "NODE_OPTIONS": "--max-old-space-size=2048",
     "CLAUDE_CONFIG_DIR": "/home/node/.claude"
   },
+  "postCreateCommand": "if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; elif [ -f package-lock.json ]; then npm ci; elif [ -f package.json ]; then npm install; fi",
+  "postStartCommand": "bash .devcontainer/post-start.sh",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",
 

@@ -10,7 +10,7 @@ Claude escribe todo el codigo. ESLint, Prettier y formatOnSave son CPU desperdic
 
 | Stack | Carpeta | Imagen base | Incluye |
 |---|---|---|---|
-| Node.js | `node/` | `node:22` | npm, Node 22, Chromium (MCP) |
+| Node.js | `node/` | `node:22` | npm, pnpm (corepack), Node 22, Chromium (MCP) |
 | Python | `python/` | `python:3.12-slim` | pip, Python 3.12, sqlite3, Node (para Claude Code) |
 
 ## Que tienen todos en comun
@@ -23,7 +23,8 @@ Claude escribe todo el codigo. ESLint, Prettier y formatOnSave son CPU desperdic
 - Sin ESLint/Prettier/GitLens en background
 - `setup-hooks.sh` para configurar quality gates solo en el commit (detecta npm/pnpm/bun)
 - `docker-compose.yml` con servicios opcionales (PostgreSQL, Redis, MySQL, MongoDB, Jaeger)
-- `postCreateCommand` auto-instala dependencias si existen
+- `postCreateCommand` auto-instala dependencias (detecta pnpm/npm/pip)
+- `postStartCommand` aplica fixes de Docker Desktop (`.gitconfig` como directorio, `safe.directory`)
 - File watcher excludes para node_modules, dist, .turbo (reduce CPU del IDE)
 
 ## Que se elimino vs el original de Anthropic
