@@ -73,11 +73,12 @@ ENV PATH=$PATH:/home/$USERNAME/.local/bin
 ENV SHELL=/bin/zsh
 ENV EDITOR=nano
 ENV VISUAL=nano
+ENV LANG=C.UTF-8
 
 # Minimal zsh (no powerlevel10k, no oh-my-zsh)
 RUN echo 'export HISTFILE=/commandhistory/.zsh_history' >> ~/.zshrc && \
-  echo 'export HISTSIZE=2000' >> ~/.zshrc && \
-  echo 'export SAVEHIST=2000' >> ~/.zshrc && \
+  echo 'export HISTSIZE=5000' >> ~/.zshrc && \
+  echo 'export SAVEHIST=5000' >> ~/.zshrc && \
   echo 'setopt HIST_IGNORE_DUPS HIST_IGNORE_SPACE SHARE_HISTORY INC_APPEND_HISTORY' >> ~/.zshrc && \
   echo 'autoload -Uz compinit && compinit' >> ~/.zshrc && \
   echo 'PROMPT="%F{green}%~%f %# "' >> ~/.zshrc
