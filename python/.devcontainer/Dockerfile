@@ -97,7 +97,7 @@ RUN echo 'export HISTFILE=/commandhistory/.zsh_history' >> ~/.zshrc && \
 # The glob trick (post-start.s[h]) guarantees COPY won't fail if requirements.txt
 # doesn't exist yet — at least one file always matches.
 # Context must be ".." (workspace root) — see devcontainer.json and docker-compose.yml.
-COPY .devcontainer/post-start.s[h] requirements.tx[t] /tmp/deps/
+COPY --chown=$USERNAME .devcontainer/post-start.s[h] requirements.tx[t] /tmp/deps/
 RUN if [ -f /tmp/deps/requirements.txt ]; then \
       pip install --no-cache-dir -r /tmp/deps/requirements.txt; \
     fi && rm -rf /tmp/deps
