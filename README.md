@@ -7,7 +7,7 @@ Templates de devcontainer optimizados para Claude CLI por stack. Fork ligero del
 | Stack | Carpeta | Imagen base | Incluye |
 |---|---|---|---|
 | Node.js | `node/` | `node:22` | npm, Node 22 |
-| Python | `python/` | `python:3.12-slim` | pip, Python 3.12, Node (para Claude Code) |
+| Python | `python/` | `python:3.12-slim` | pip, Python 3.12, sqlite3, Node (para Claude Code) |
 
 ## Que tienen todos en comun
 
@@ -17,6 +17,7 @@ Templates de devcontainer optimizados para Claude CLI por stack. Fork ligero del
 - Claude Code instalado globalmente
 - Sin ESLint/Prettier/GitLens en background
 - `setup-hooks.sh` para configurar quality gates solo en el commit
+- `postCreateCommand` auto-instala requirements.txt y pre-commit hooks si existen
 
 ## Que se elimino vs el original de Anthropic
 
@@ -46,13 +47,15 @@ cp -r python/.devcontainer tu-proyecto/
 
 ```bash
 # Dentro del devcontainer, en la raiz del proyecto:
-bash .devcontainer/setup-hooks.sh
+bash .devcontainer/setup-hooks.sh          # ruff only (rapido)
+bash .devcontainer/setup-hooks.sh full     # ruff + file checks + bandit
 ```
 
 Esto instala git hooks que corren linting/formatting **solo sobre archivos staged** en el momento del commit. Cero procesos en background.
 
 - **Node**: husky + lint-staged + eslint + prettier
-- **Python**: pre-commit + ruff (lint + format)
+- **Python minimal**: pre-commit + ruff (lint + format)
+- **Python full**: pre-commit + ruff + pre-commit-hooks + bandit (security)
 
 ### 3. Agregar servicios
 

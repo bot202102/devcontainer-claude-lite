@@ -28,8 +28,10 @@
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
   ],
   "containerEnv": {
+    "PYTHONUNBUFFERED": "1",
     "CLAUDE_CONFIG_DIR": "/home/dev/.claude"
   },
+  "postCreateCommand": "if [ -f requirements.txt ]; then pip install -r requirements.txt; fi && if [ -f .pre-commit-config.yaml ]; then pre-commit install; fi",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace"
 }

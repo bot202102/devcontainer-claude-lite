@@ -3,7 +3,7 @@ FROM python:3.12-slim
 ARG TZ
 ENV TZ="$TZ"
 
-# Essential system tools + Node (required for Claude Code) + Playwright/Chromium dependencies
+# Essential system tools + Node (for Claude Code) + Playwright/Chromium deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
   less \
   git \
@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   nano \
   ca-certificates \
   curl \
+  sqlite3 \
   nodejs \
   npm \
   # Playwright/Chromium dependencies
