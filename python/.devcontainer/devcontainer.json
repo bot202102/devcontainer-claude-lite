@@ -32,6 +32,7 @@
     "CLAUDE_CONFIG_DIR": "/home/dev/.claude"
   },
   "postCreateCommand": "if [ -f requirements.txt ]; then pip install -r requirements.txt; fi && if [ -f .pre-commit-config.yaml ]; then pre-commit install; fi",
+  "postStartCommand": "bash .devcontainer/post-start.sh",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace"
 }
