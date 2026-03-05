@@ -15,7 +15,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   nano \
   ca-certificates \
   curl \
-  # Playwright/Chromium dependencies
+  # Chromium: full browser for Chrome DevTools MCP (not just libs)
+  # Gives you browser automation, screenshots, accessibility snapshots
+  chromium \
+  # Chromium/Playwright shared dependencies
   libnss3 \
   libatk1.0-0 \
   libatk-bridge2.0-0 \
@@ -32,6 +35,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libasound2 \
   libatspi2.0-0 \
   libxshmfence1 \
+  fonts-liberation \
+  ## -----------------------------------------------------------
+  ## OPTIONAL: Uncomment what you need for your stack
+  ## -----------------------------------------------------------
+  ## DB clients (debug from inside container without external tools)
+  # postgresql-client \
+  # default-mysql-client \
+  # redis-tools \
+  ## Network debug
+  # netcat-traditional \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Docker CLI (uses host's Docker via socket)
@@ -74,6 +87,11 @@ ENV PATH=$PATH:/usr/local/share/npm-global/bin
 ENV SHELL=/bin/zsh
 ENV EDITOR=nano
 ENV VISUAL=nano
+
+# Chromium: skip Playwright download, use system binary
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+ENV CHROME_PATH=/usr/bin/chromium
 
 # Minimal zsh (no powerlevel10k, no oh-my-zsh)
 RUN echo 'export HISTFILE=/commandhistory/.zsh_history' >> ~/.zshrc && \
