@@ -1,9 +1,9 @@
-FROM node:20
+FROM python:3.12-slim
 
 ARG TZ
 ENV TZ="$TZ"
 
-# Install essential tools only (no vim, man-db, fzf, unzip, gnupg2)
+# Essential system tools + Node (required for Claude Code)
 RUN apt-get update && apt-get install -y --no-install-recommends \
   less \
   git \
@@ -15,9 +15,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   nano \
   ca-certificates \
   curl \
+  nodejs \
+  npm \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Docker CLI (not the daemon — uses host's Docker via socket)
+# Docker CLI (uses host's Docker via socket)
 RUN install -m 0755 -d /etc/apt/keyrings && \
   curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc && \
   chmod a+r /etc/apt/keyrings/docker.asc && \
@@ -26,50 +28,42 @@ RUN install -m 0755 -d /etc/apt/keyrings && \
   apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin && \
   apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Ensure default node user has access to /usr/local/share
-RUN mkdir -p /usr/local/share/npm-global && \
-  chown -R node:node /usr/local/share
-
-ARG USERNAME=node
-
-# Allow node user to use docker without sudo
-RUN groupadd -f docker && usermod -aG docker $USERNAME
+# Create non-root user
+ARG USERNAME=dev
+RUN useradd -m -s /bin/zsh $USERNAME && \
+  echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME && \
+  groupadd -f docker && usermod -aG docker $USERNAME
 
 # Persist shell history
 RUN mkdir /commandhistory && \
   touch /commandhistory/.zsh_history && \
   chown -R $USERNAME /commandhistory
 
-# Set environment
 ENV DEVCONTAINER=true
 
-# Create workspace and config directories
-RUN mkdir -p /workspace /home/node/.claude && \
-  chown -R node:node /workspace /home/node/.claude
+RUN mkdir -p /workspace /home/$USERNAME/.claude && \
+  chown -R $USERNAME:$USERNAME /workspace /home/$USERNAME/.claude
 
 WORKDIR /workspace
+USER $USERNAME
 
-# Set up non-root user
-USER node
+# Python: no virtualenv needed in container, install direct
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
+ENV PATH=$PATH:/home/$USERNAME/.local/bin
 
-# Global npm config
-ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
-ENV PATH=$PATH:/usr/local/share/npm-global/bin
-
-# Shell defaults
+# Shell
 ENV SHELL=/bin/zsh
 ENV EDITOR=nano
 ENV VISUAL=nano
 
-# Minimal zsh: persistent history + autocompletion + simple prompt
-# No powerlevel10k, no oh-my-zsh, no fzf — saves CPU on every prompt
+# Minimal zsh (no powerlevel10k, no oh-my-zsh)
 RUN echo 'export HISTFILE=/commandhistory/.zsh_history' >> ~/.zshrc && \
   echo 'export HISTSIZE=2000' >> ~/.zshrc && \
   echo 'export SAVEHIST=2000' >> ~/.zshrc && \
   echo 'setopt HIST_IGNORE_DUPS HIST_IGNORE_SPACE SHARE_HISTORY INC_APPEND_HISTORY' >> ~/.zshrc && \
   echo 'autoload -Uz compinit && compinit' >> ~/.zshrc && \
-  echo 'PROMPT="%F{blue}%~%f %# "' >> ~/.zshrc
+  echo 'PROMPT="%F{green}%~%f %# "' >> ~/.zshrc
 
-# Install Claude Code globally
+# Claude Code (needs npm)
 ARG CLAUDE_CODE_VERSION=latest
-RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
+RUN sudo npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}

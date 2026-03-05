@@ -1,57 +1,90 @@
 # devcontainer-claude-lite
 
-Devcontainer template optimizado para Claude CLI. Fork ligero del [devcontainer oficial de Anthropic](https://github.com/anthropics/claude-code/tree/main/.devcontainer).
+Templates de devcontainer optimizados para Claude CLI por stack. Fork ligero del [devcontainer oficial de Anthropic](https://github.com/anthropics/claude-code/tree/main/.devcontainer).
 
-## Diferencias vs el original
+## Stacks disponibles
 
-| Aspecto | Anthropic original | Esta versión |
+| Stack | Carpeta | Imagen base | Incluye |
+|---|---|---|---|
+| Node.js | `node/` | `node:20` | npm, Node 20 |
+| Python | `python/` | `python:3.12-slim` | pip, Python 3.12, Node (para Claude Code) |
+
+## Que tienen todos en comun
+
+- Zsh minimo (sin powerlevel10k, sin oh-my-zsh)
+- Historial persistente entre reinicios
+- Docker CLI via socket del host
+- Claude Code instalado globalmente
+- Sin ESLint/Prettier/GitLens en background
+- `setup-hooks.sh` para configurar quality gates solo en el commit
+
+## Que se elimino vs el original de Anthropic
+
+| Aspecto | Anthropic original | Esta version |
 |---|---|---|
-| Shell theme | powerlevel10k (calcula git status en cada prompt) | Prompt mínimo `%~ %#` |
-| Extensiones VS Code | ESLint, Prettier, GitLens | Solo `anthropic.claude-code` |
-| formatOnSave / codeActionsOnSave | Activo | Eliminado |
-| Paquetes del sistema | vim, man-db, fzf, unzip, gnupg2, git-delta | Solo lo esencial |
+| Shell theme | powerlevel10k | Prompt minimo |
+| Extensiones VS Code | ESLint, Prettier, GitLens | Solo claude-code + lenguaje |
+| formatOnSave | Activo | Eliminado |
+| Paquetes sistema | vim, man-db, fzf, unzip, gnupg2, git-delta | Solo lo esencial |
 | NODE_OPTIONS | 4 GB | 2 GB |
-| Docker | No disponible | Docker CLI via socket del host |
-| Historial shell | bash history básico | zsh con SHARE_HISTORY persistente |
-
-## Por qué importa
-
-Claude CLI ejecuta muchos comandos bash. Cada comando dispara el prompt de zsh. Con powerlevel10k, cada prompt calcula git status, segmentos, iconos — CPU que Claude nunca ve. ESLint/GitLens corren en background consumiendo memoria analizando archivos que Claude maneja con sus propias herramientas.
+| Docker | No disponible | Docker CLI via socket |
+| Quality gates | En background (tiempo real) | Solo en commit (git hooks) |
 
 ## Uso
 
-### Como template para un proyecto nuevo
+### 1. Copiar el template a tu proyecto
 
-Copia la carpeta `.devcontainer/` a la raíz de tu proyecto.
+```bash
+# Para Node.js
+cp -r node/.devcontainer tu-proyecto/
 
-### Agregar servicios (DB, Redis, etc.)
+# Para Python
+cp -r python/.devcontainer tu-proyecto/
+```
 
-Crea un `docker-compose.yml` en `.devcontainer/` y referéncialo:
+### 2. Configurar quality gates (una vez, en el proyecto)
+
+```bash
+# Dentro del devcontainer, en la raiz del proyecto:
+bash .devcontainer/setup-hooks.sh
+```
+
+Esto instala git hooks que corren linting/formatting **solo sobre archivos staged** en el momento del commit. Cero procesos en background.
+
+- **Node**: husky + lint-staged + eslint + prettier
+- **Python**: pre-commit + ruff (lint + format)
+
+### 3. Agregar servicios
+
+Crea un `docker-compose.yml` junto al `Dockerfile` y usa Docker desde dentro del container:
+
+```bash
+docker compose -f .devcontainer/docker-compose.yml up -d
+```
+
+O referencialo en `devcontainer.json`:
 
 ```jsonc
-// devcontainer.json
 {
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
-  // ... resto de la config
+  // ...
 }
 ```
 
-### Agregar extensiones de lenguaje
+### 4. Agregar extensiones de lenguaje
 
-Agrega solo extensiones de soporte de lenguaje ligeras:
+Solo extensiones ligeras de soporte de lenguaje:
 
 ```jsonc
 "extensions": [
   "anthropic.claude-code",
-  "Prisma.prisma",           // si usas Prisma
-  "bradlc.vscode-tailwindcss" // si usas Tailwind
+  "Prisma.prisma",
+  "bradlc.vscode-tailwindcss"
 ]
 ```
-
-No agregar: ESLint, Prettier, GitLens, ni nada que corra procesos en background. El linting se hace manual (`npx eslint .`) o via git hooks pre-commit.
 
 ## Requisitos
 
 - Docker Desktop o Docker Engine en el host
-- VS Code con la extensión Dev Containers
+- VS Code con la extension Dev Containers

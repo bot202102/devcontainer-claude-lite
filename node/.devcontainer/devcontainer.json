@@ -1,5 +1,5 @@
 {
-  "name": "Claude Code Lite",
+  "name": "Claude Code Lite — Node",
   "build": {
     "dockerfile": "Dockerfile",
     "args": {

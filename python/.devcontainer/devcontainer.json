@@ -1,0 +1,35 @@
+{
+  "name": "Claude Code Lite — Python",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "TZ": "${localEnv:TZ:America/Lima}",
+      "CLAUDE_CODE_VERSION": "latest"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "ms-python.python"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.profiles.linux": {
+          "zsh": { "path": "zsh" }
+        }
+      }
+    }
+  },
+  "remoteUser": "dev",
+  "mounts": [
+    "source=claude-lite-history-${devcontainerId},target=/commandhistory,type=volume",
+    "source=claude-lite-config-${devcontainerId},target=/home/dev/.claude,type=volume",
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+  "containerEnv": {
+    "CLAUDE_CONFIG_DIR": "/home/dev/.claude"
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
+  "workspaceFolder": "/workspace"
+}
