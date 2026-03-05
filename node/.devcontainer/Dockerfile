@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   nano \
   ca-certificates \
   curl \
+  # Build essentials (native npm packages: node-gyp, sharp, bcrypt, etc.)
+  build-essential \
+  python3 \
   # Chromium: full browser for Chrome DevTools MCP (not just libs)
   # Gives you browser automation, screenshots, accessibility snapshots
   chromium \
@@ -87,6 +90,7 @@ ENV PATH=$PATH:/usr/local/share/npm-global/bin
 ENV SHELL=/bin/zsh
 ENV EDITOR=nano
 ENV VISUAL=nano
+ENV LANG=C.UTF-8
 
 # Chromium: skip Playwright download, use system binary
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
@@ -95,8 +99,8 @@ ENV CHROME_PATH=/usr/bin/chromium
 
 # Minimal zsh (no powerlevel10k, no oh-my-zsh)
 RUN echo 'export HISTFILE=/commandhistory/.zsh_history' >> ~/.zshrc && \
-  echo 'export HISTSIZE=2000' >> ~/.zshrc && \
-  echo 'export SAVEHIST=2000' >> ~/.zshrc && \
+  echo 'export HISTSIZE=5000' >> ~/.zshrc && \
+  echo 'export SAVEHIST=5000' >> ~/.zshrc && \
   echo 'setopt HIST_IGNORE_DUPS HIST_IGNORE_SPACE SHARE_HISTORY INC_APPEND_HISTORY' >> ~/.zshrc && \
   echo 'autoload -Uz compinit && compinit' >> ~/.zshrc && \
   echo 'PROMPT="%F{blue}%~%f %# "' >> ~/.zshrc

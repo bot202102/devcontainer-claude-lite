@@ -17,6 +17,12 @@
         "terminal.integrated.profiles.linux": {
           "zsh": { "path": "zsh" }
         },
+        "editor.formatOnSave": false,
+        "editor.codeActionsOnSave": {},
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true,
+        "eslint.enable": false,
+        "files.eol": "\n",
         "files.watcherExclude": {
           "**/node_modules/**": true,
           "**/.git/objects/**": true,
@@ -51,7 +57,7 @@
   "postCreateCommand": "if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; elif [ -f package-lock.json ]; then npm ci; elif [ -f package.json ]; then npm install; fi",
   "postStartCommand": "bash .devcontainer/post-start.sh",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
-  "workspaceFolder": "/workspace",
+  "workspaceFolder": "/workspace"
 
   // -----------------------------------------------------------
   // OPTIONAL: Uncomment to use docker-compose with services
@@ -73,7 +79,5 @@
   // "remoteEnv": {
   //   "DATABASE_URL": "postgresql://user:pass@postgres:5432/mydb",
   //   "REDIS_URL": "redis://:pass@redis:6379"
-  // },
-
-  "postCreateCommand": "if [ -f package.json ]; then npm install; fi"
+  // }
 }
