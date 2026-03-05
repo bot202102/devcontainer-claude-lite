@@ -3,7 +3,7 @@ FROM python:3.12-slim
 ARG TZ
 ENV TZ="$TZ"
 
-# Essential system tools + Node (for Claude Code) + Playwright/Chromium deps
+# Essential system tools + Chromium + Playwright deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
   less \
   git \
@@ -16,9 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   ca-certificates \
   curl \
   sqlite3 \
-  nodejs \
-  npm \
-  # Playwright/Chromium dependencies
+  # Build essentials (native pip packages: Pillow, cryptography, psycopg2, etc.)
+  build-essential \
+  # Chromium: full browser for Chrome DevTools MCP
+  chromium \
+  # Chromium/Playwright shared dependencies
   libnss3 \
   libatk1.0-0 \
   libatk-bridge2.0-0 \
@@ -35,6 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libasound2 \
   libatspi2.0-0 \
   libxshmfence1 \
+  fonts-liberation \
   ## -----------------------------------------------------------
   ## OPTIONAL: Uncomment what you need for your stack
   ## -----------------------------------------------------------
@@ -45,6 +48,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   ## Network debug
   # netcat-traditional \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Node.js 22 (Claude Code requires modern Node — Debian apt ships Node 18 EOL)
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+  apt-get install -y --no-install-recommends nodejs && \
+  apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Docker CLI (uses host's Docker via socket)
 RUN install -m 0755 -d /etc/apt/keyrings && \
@@ -83,6 +91,11 @@ ENV SHELL=/bin/zsh
 ENV EDITOR=nano
 ENV VISUAL=nano
 ENV LANG=C.UTF-8
+
+# Chromium: skip Playwright download, use system binary
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+ENV CHROME_PATH=/usr/bin/chromium
 
 # Minimal zsh (no powerlevel10k, no oh-my-zsh)
 RUN echo 'export HISTFILE=/commandhistory/.zsh_history' >> ~/.zshrc && \

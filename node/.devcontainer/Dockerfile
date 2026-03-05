@@ -81,7 +81,10 @@ RUN mkdir -p /workspace /home/node/.claude && \
 
 WORKDIR /workspace
 
-# pnpm via corepack - must run as root before USER switch
+# pnpm via corepack — disable interactive prompts and strict version checks
+# to prevent blocking postCreateCommand when offline or during first setup
+ENV COREPACK_ENABLE_AUTO_PIN=0
+ENV COREPACK_ENABLE_STRICT=0
 RUN corepack enable
 
 USER node
