@@ -35,6 +35,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libasound2 \
   libatspi2.0-0 \
   libxshmfence1 \
+  ## -----------------------------------------------------------
+  ## OPTIONAL: Uncomment what you need for your stack
+  ## -----------------------------------------------------------
+  ## DB clients (debug from inside container without external tools)
+  # postgresql-client \
+  # default-mysql-client \
+  # redis-tools \
+  ## Network debug
+  # netcat-traditional \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Docker CLI (uses host's Docker via socket)
@@ -82,6 +91,16 @@ RUN echo 'export HISTFILE=/commandhistory/.zsh_history' >> ~/.zshrc && \
   echo 'setopt HIST_IGNORE_DUPS HIST_IGNORE_SPACE SHARE_HISTORY INC_APPEND_HISTORY' >> ~/.zshrc && \
   echo 'autoload -Uz compinit && compinit' >> ~/.zshrc && \
   echo 'PROMPT="%F{green}%~%f %# "' >> ~/.zshrc
+
+# Python deps: bake into image so ALL compose services (workers, etc.) get them.
+# postCreateCommand only runs on the main devcontainer service.
+# The glob trick (post-start.s[h]) guarantees COPY won't fail if requirements.txt
+# doesn't exist yet — at least one file always matches.
+# Context must be ".." (workspace root) — see devcontainer.json and docker-compose.yml.
+COPY .devcontainer/post-start.s[h] requirements.tx[t] /tmp/deps/
+RUN if [ -f /tmp/deps/requirements.txt ]; then \
+      pip install --no-cache-dir -r /tmp/deps/requirements.txt; \
+    fi && rm -rf /tmp/deps
 
 # Claude Code (needs npm)
 ARG CLAUDE_CODE_VERSION=latest

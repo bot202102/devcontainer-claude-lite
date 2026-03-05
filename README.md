@@ -25,7 +25,20 @@ Claude escribe todo el codigo. ESLint, Prettier y formatOnSave son CPU desperdic
 - `docker-compose.yml` con servicios opcionales (PostgreSQL, Redis, MySQL, MongoDB, Jaeger)
 - `postCreateCommand` auto-instala dependencias (detecta pnpm/npm/pip)
 - `postStartCommand` aplica fixes de Docker Desktop (`.gitconfig` como directorio, `safe.directory`)
-- File watcher excludes para node_modules, dist, .turbo (reduce CPU del IDE)
+- File watcher excludes para reducir CPU del IDE
+
+## Python: deps baked into image
+
+El template Python instala `requirements.txt` **en el Dockerfile** (no solo en `postCreateCommand`). Esto garantiza que TODOS los servicios de docker-compose (app, workers, schedulers, etc.) tengan las dependencias Python disponibles.
+
+`postCreateCommand` sigue corriendo `pip install` como fallback para actualizar deps sin rebuild.
+
+```
+Build context = ".." (workspace root)
+  -> Dockerfile COPY requirements.txt (si existe)
+  -> pip install en la imagen
+  -> Todos los servicios comparten la misma imagen con deps
+```
 
 ## Que se elimino vs el original de Anthropic
 
@@ -79,6 +92,7 @@ redis:       # Redis 7
 mysql:       # MySQL 8 (alternativa a PostgreSQL)
 mongo:       # MongoDB 7
 jaeger:      # OpenTelemetry traces
+worker:      # Worker example (Python: celery/taskiq/etc.)
 ```
 
 **Modo standalone** (sin devcontainer integration):

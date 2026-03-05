@@ -2,6 +2,7 @@
   "name": "Claude Code Lite — Python",
   "build": {
     "dockerfile": "Dockerfile",
+    "context": "..",
     "args": {
       "TZ": "${localEnv:TZ:America/Lima}",
       "CLAUDE_CODE_VERSION": "latest"
@@ -17,6 +18,26 @@
         "terminal.integrated.defaultProfile.linux": "zsh",
         "terminal.integrated.profiles.linux": {
           "zsh": { "path": "zsh" }
+        },
+        "files.watcherExclude": {
+          "**/__pycache__/**": true,
+          "**/.git/objects/**": true,
+          "**/.git/subtree-cache/**": true,
+          "**/.mypy_cache/**": true,
+          "**/.ruff_cache/**": true,
+          "**/.pytest_cache/**": true,
+          "**/dist/**": true,
+          "**/build/**": true,
+          "**/*.egg-info/**": true
+        },
+        "search.exclude": {
+          "**/__pycache__": true,
+          "**/.mypy_cache": true,
+          "**/.ruff_cache": true,
+          "**/.pytest_cache": true,
+          "**/dist": true,
+          "**/build": true,
+          "**/*.egg-info": true
         }
       }
     }
@@ -35,4 +56,25 @@
   "postStartCommand": "bash .devcontainer/post-start.sh",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace"
+
+  // -----------------------------------------------------------
+  // OPTIONAL: Uncomment to use docker-compose with services
+  // -----------------------------------------------------------
+  // "dockerComposeFile": "docker-compose.yml",
+  // "service": "app",
+  // "shutdownAction": "stopCompose",
+  //
+  // Port forwarding (adjust to your services):
+  // "forwardPorts": [8000, 5432, 6379],
+  // "portsAttributes": {
+  //   "8000": { "label": "FastAPI", "onAutoForward": "notify" },
+  //   "5432": { "label": "PostgreSQL", "onAutoForward": "silent" },
+  //   "6379": { "label": "Redis", "onAutoForward": "silent" }
+  // },
+  //
+  // Service env vars (container-to-container DNS):
+  // "remoteEnv": {
+  //   "DATABASE_URL": "postgresql://user:pass@postgres:5432/mydb",
+  //   "REDIS_URL": "redis://:pass@redis:6379"
+  // }
 }
