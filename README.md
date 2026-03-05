@@ -6,7 +6,7 @@ Templates de devcontainer optimizados para Claude CLI por stack. Fork ligero del
 
 | Stack | Carpeta | Imagen base | Incluye |
 |---|---|---|---|
-| Node.js | `node/` | `node:20` | npm, Node 20 |
+| Node.js | `node/` | `node:22` | npm, Node 22 |
 | Python | `python/` | `python:3.12-slim` | pip, Python 3.12, Node (para Claude Code) |
 
 ## Que tienen todos en comun
