@@ -6,7 +6,7 @@ Templates de devcontainer optimizados para Claude CLI por stack. Fork ligero del
 
 | Stack | Carpeta | Imagen base | Incluye |
 |---|---|---|---|
-| Node.js | `node/` | `node:22` | npm, Node 22 |
+| Node.js | `node/` | `node:22` | npm, pnpm (corepack), Node 22 |
 | Python | `python/` | `python:3.12-slim` | pip, Python 3.12, sqlite3, Node (para Claude Code) |
 
 ## Que tienen todos en comun
@@ -17,7 +17,8 @@ Templates de devcontainer optimizados para Claude CLI por stack. Fork ligero del
 - Claude Code instalado globalmente
 - Sin ESLint/Prettier/GitLens en background
 - `setup-hooks.sh` para configurar quality gates solo en el commit
-- `postCreateCommand` auto-instala requirements.txt y pre-commit hooks si existen
+- `postCreateCommand` auto-instala dependencias (detecta pnpm/npm/pip)
+- `postStartCommand` aplica fixes de Docker Desktop (`.gitconfig` como directorio, `safe.directory`)
 
 ## Que se elimino vs el original de Anthropic
 
