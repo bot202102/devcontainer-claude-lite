@@ -24,6 +24,7 @@ Claude escribe todo el codigo. ESLint, Prettier y formatOnSave son CPU desperdic
 - `setup-hooks.sh` para configurar quality gates solo en el commit (detecta npm/pnpm/bun)
 - `docker-compose.yml` con servicios opcionales (PostgreSQL, Redis, MySQL, MongoDB, Jaeger)
 - `postCreateCommand` auto-instala dependencias (detecta pnpm/npm/pip)
+- `initializeCommand` limpia VS Code Server viejo de la VM Docker Desktop (previene "No space left on device")
 - `postStartCommand` aplica fixes de Docker Desktop (`.gitconfig` como directorio, `safe.directory`)
 - File watcher excludes para reducir CPU del IDE
 - Healthcheck de red en el servicio `app` (detecta perdida silenciosa de conectividad)
@@ -166,6 +167,35 @@ El container incluye Chromium completo. Para usarlo con Claude Code, agrega a tu
 ```
 
 ## Troubleshooting
+
+### Rebuild falla con "No space left on device" (Docker Desktop / Windows)
+
+**Causa**: Docker Desktop usa una VM WSL (`docker-desktop`) con un root filesystem de solo 136MB. VS Code Dev Containers instala un binario `node` de ~62MB ahi como paso intermedio antes de copiarlo al contenedor. Las instalaciones anteriores se acumulan y llenan el disco.
+
+**Diagnostico**:
+```bash
+# Verificar espacio en la VM
+powershell.exe -NoProfile -Command "wsl -d docker-desktop -- df -h /"
+# Si muestra 100% — este es el problema
+```
+
+**Solucion automatica**: El template incluye `initializeCommand` que limpia automaticamente antes de cada build. Si estas usando una version anterior del template, agrega a tu `devcontainer.json`:
+
+```jsonc
+"initializeCommand": "bash .devcontainer/initialize.sh"
+```
+
+**Solucion manual**:
+```bash
+powershell.exe -NoProfile -Command "wsl -d docker-desktop -- rm -rf /root/.vscode-remote-containers/bin/"
+```
+
+**Limpieza adicional** (si el disco de datos de Docker tambien esta lleno):
+```bash
+docker builder prune -a -f    # Build cache (puede ser decenas de GB)
+docker system prune --volumes  # Imagenes/volumenes huerfanos
+docker system df               # Verificar espacio recuperado
+```
 
 ### Container sin internet / Claude Code: `EAI_AGAIN`
 
