@@ -76,8 +76,8 @@ RUN mkdir /commandhistory && \
 
 ENV DEVCONTAINER=true
 
-RUN mkdir -p /workspace /home/node/.claude && \
-  chown -R node:node /workspace /home/node/.claude
+RUN mkdir -p /workspace /home/node/.claude /home/node/.vscode-server && \
+  chown -R node:node /workspace /home/node/.claude /home/node/.vscode-server
 
 WORKDIR /workspace
 
