@@ -32,6 +32,7 @@ services:
       - ..:/workspace:cached
       - claude-lite-history:/commandhistory
       - claude-lite-config:/home/node/.claude
+      - claude-lite-node-modules:/workspace/node_modules
       - /var/run/docker.sock:/var/run/docker.sock
     command: sleep infinity
     # Detect network loss early (port conflicts cause silent disconnects)
@@ -139,6 +140,7 @@ services:
 volumes:
   claude-lite-history:
   claude-lite-config:
+  claude-lite-node-modules:
   # pgdata:
   # redisdata:
   # mysqldata:
