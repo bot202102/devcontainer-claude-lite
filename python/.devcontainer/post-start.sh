@@ -36,8 +36,8 @@ if [ -S /var/run/docker.sock ]; then
   SOCK_GID=$(stat -c '%g' /var/run/docker.sock)
   CUR_GID=$(getent group docker | cut -d: -f3)
   if [ "$SOCK_GID" != "$CUR_GID" ]; then
-    echo "[post-start] Fixing docker group GID ($CUR_GID -> $SOCK_GID) to match host socket..."
-    sudo groupmod -g "$SOCK_GID" docker 2>/dev/null || true
+    echo "[post-start] Fixing docker socket access (socket GID=$SOCK_GID, docker group GID=$CUR_GID)..."
+    sudo chmod 666 /var/run/docker.sock
   fi
 fi
 

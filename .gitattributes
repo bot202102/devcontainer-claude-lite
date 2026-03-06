@@ -1,0 +1,7 @@
+# Force LF line endings for all text files.
+# Prevents CRLF issues when Windows hosts create files used inside Linux containers.
+* text=auto eol=lf
+
+# Ensure shell scripts are always LF (critical — bash fails with \r)
+*.sh text eol=lf
+*.bash text eol=lf
