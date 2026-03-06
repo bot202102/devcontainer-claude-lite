@@ -37,6 +37,8 @@ services:
       - claude-lite-history:/commandhistory
       - claude-lite-config:/home/dev/.claude
       - /var/run/docker.sock:/var/run/docker.sock
+    security_opt:
+      - seccomp=unconfined
     command: sleep infinity
     # Detect network loss early (port conflicts cause silent disconnects)
     healthcheck:

@@ -7,6 +7,9 @@
       "CLAUDE_CODE_VERSION": "latest"
     }
   },
+  "runArgs": [
+    "--security-opt", "seccomp=unconfined"
+  ],
   "customizations": {
     "vscode": {
       "extensions": [
@@ -48,6 +51,7 @@
   "mounts": [
     "source=claude-lite-history-${devcontainerId},target=/commandhistory,type=volume",
     "source=claude-lite-config-${devcontainerId},target=/home/node/.claude,type=volume",
+    "source=claude-lite-node-modules-${devcontainerId},target=/workspace/node_modules,type=volume",
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
   ],
   "containerEnv": {
@@ -55,7 +59,7 @@
     "CLAUDE_CONFIG_DIR": "/home/node/.claude"
   },
   "initializeCommand": "bash .devcontainer/initialize.sh",
-  "postCreateCommand": "if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; elif [ -f package-lock.json ]; then npm ci; elif [ -f package.json ]; then npm install; fi",
+  "postCreateCommand": "sudo chown node:node /workspace/node_modules && (if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile || pnpm install; elif [ -f package-lock.json ]; then npm ci; elif [ -f package.json ]; then npm install; fi)",
   "postStartCommand": "bash .devcontainer/post-start.sh",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace"

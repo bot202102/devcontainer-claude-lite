@@ -31,13 +31,14 @@ if [ -d /workspace/node_modules ] && [ "$(stat -c '%u' /workspace/node_modules 2
 fi
 
 # Fix: Docker socket GID from host may not match container's docker group GID.
-# Without this, `docker` commands require sudo despite user being in docker group.
+# groupmod fails silently when socket GID is 0 (root) since that GID is already
+# taken. Use chmod 666 as a reliable fallback that works in all cases.
 if [ -S /var/run/docker.sock ]; then
   SOCK_GID=$(stat -c '%g' /var/run/docker.sock)
   CUR_GID=$(getent group docker | cut -d: -f3)
   if [ "$SOCK_GID" != "$CUR_GID" ]; then
-    echo "[post-start] Fixing docker group GID ($CUR_GID -> $SOCK_GID) to match host socket..."
-    sudo groupmod -g "$SOCK_GID" docker 2>/dev/null || true
+    echo "[post-start] Fixing docker socket access (socket GID=$SOCK_GID, docker group GID=$CUR_GID)..."
+    sudo chmod 666 /var/run/docker.sock
   fi
 fi
 

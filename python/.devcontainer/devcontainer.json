@@ -8,6 +8,9 @@
       "CLAUDE_CODE_VERSION": "latest"
     }
   },
+  "runArgs": [
+    "--security-opt", "seccomp=unconfined"
+  ],
   "customizations": {
     "vscode": {
       "extensions": [
