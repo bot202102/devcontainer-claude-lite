@@ -52,7 +52,7 @@
     "PYTHONUNBUFFERED": "1",
     "CLAUDE_CONFIG_DIR": "/home/dev/.claude"
   },
-  "initializeCommand": ["wsl", "-d", "docker-desktop", "--", "rm", "-rf", "/root/.vscode-remote-containers/bin/", "/root/.vscode-server/"],
+  "initializeCommand": "bash .devcontainer/initialize.sh",
   "postCreateCommand": "if [ -f requirements.txt ]; then pip install -r requirements.txt; fi && if [ -f .pre-commit-config.yaml ]; then pre-commit install; fi",
   "postStartCommand": "bash .devcontainer/post-start.sh",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",

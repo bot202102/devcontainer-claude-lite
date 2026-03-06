@@ -148,6 +148,48 @@ services:
   #     - "${MONGO_PORT:-27017}:27017"
 
   ## ---------------------------------------------------------
+  ## Qdrant (vector search) — uncomment to enable
+  ## NOTE: qdrant/qdrant image has NO curl/wget — healthcheck
+  ## uses bash /dev/tcp instead. Do NOT switch to curl.
+  ## ---------------------------------------------------------
+  # qdrant:
+  #   image: qdrant/qdrant:latest
+  #   restart: unless-stopped
+  #   volumes:
+  #     - qdrantdata:/qdrant/storage
+  #   ports:
+  #     - "${QDRANT_PORT:-6333}:6333"
+  #     - "${QDRANT_GRPC_PORT:-6334}:6334"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "timeout 2 bash -c 'echo > /dev/tcp/localhost/6333' || exit 1"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 20s
+
+  ## ---------------------------------------------------------
+  ## Minio (S3-compatible storage) — uncomment to enable
+  ## ---------------------------------------------------------
+  # minio:
+  #   image: minio/minio:latest
+  #   restart: unless-stopped
+  #   command: server /data --console-address ":9001"
+  #   environment:
+  #     MINIO_ROOT_USER: minioadmin
+  #     MINIO_ROOT_PASSWORD: minioadmin
+  #   volumes:
+  #     - miniodata:/data
+  #   ports:
+  #     - "${MINIO_PORT:-9000}:9000"
+  #     - "${MINIO_CONSOLE_PORT:-9001}:9001"
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 10s
+
+  ## ---------------------------------------------------------
   ## Jaeger (OpenTelemetry traces) — uncomment to enable
   ## ---------------------------------------------------------
   # jaeger:
@@ -166,3 +208,5 @@ volumes:
   # redisdata:
   # mysqldata:
   # mongodata:
+  # qdrantdata:
+  # miniodata:
