@@ -15,5 +15,20 @@ if [ -d "$HOME/.gitconfig" ]; then
     sed -i "1a\\$LINE" ~/.zshrc
 fi
 
+# Fix: node_modules may have wrong ownership from host or previous root build.
+# This prevents pnpm/npm from failing with EACCES on install or update.
+if [ -d /workspace/node_modules ] && [ "$(stat -c '%u' /workspace/node_modules 2>/dev/null)" != "$(id -u)" ]; then
+  echo "[post-start] node_modules has wrong owner ($(stat -c '%u' /workspace/node_modules) != $(id -u)). Removing..."
+  sudo rm -rf /workspace/node_modules
+  echo "[post-start] Removed stale node_modules. Running install..."
+  if [ -f /workspace/pnpm-lock.yaml ]; then
+    cd /workspace && pnpm install
+  elif [ -f /workspace/package-lock.json ]; then
+    cd /workspace && npm ci
+  elif [ -f /workspace/package.json ]; then
+    cd /workspace && npm install
+  fi
+fi
+
 # Bind-mounted workspaces may have different uid — mark as safe
 git config --global safe.directory /workspace 2>/dev/null || true
