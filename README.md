@@ -22,7 +22,7 @@ Claude escribe todo el codigo. ESLint, Prettier y formatOnSave son CPU desperdic
 - Chromium completo para [Chrome DevTools MCP](https://github.com/anthropics/claude-code/blob/main/docs/mcp.md) (screenshots, snapshots, browser automation)
 - Sin ESLint/Prettier/GitLens en background
 - `setup-hooks.sh` para configurar quality gates solo en el commit (detecta npm/pnpm/bun)
-- `docker-compose.yml` con servicios opcionales (PostgreSQL, Redis, MySQL, MongoDB, Jaeger)
+- `docker-compose.yml` con servicios opcionales (PostgreSQL, Redis, MySQL, MongoDB, Qdrant, Minio, Jaeger)
 - `postCreateCommand` auto-instala dependencias (detecta pnpm/npm/pip)
 - `initializeCommand` limpia VS Code Server viejo de la VM Docker Desktop (previene "No space left on device")
 - `postStartCommand` aplica fixes de Docker Desktop (`.gitconfig` como directorio, `safe.directory`)
@@ -95,6 +95,8 @@ postgres:    # PostgreSQL 16
 redis:       # Redis 7
 mysql:       # MySQL 8 (alternativa a PostgreSQL)
 mongo:       # MongoDB 7
+qdrant:      # Qdrant vector search (AI/RAG)
+minio:       # Minio S3-compatible storage
 jaeger:      # OpenTelemetry traces
 worker:      # Worker example (Python: celery/taskiq/etc.)
 ```
@@ -111,6 +113,9 @@ POSTGRES_PORT=31432
 REDIS_PORT=31379
 MYSQL_PORT=31306
 MONGO_PORT=31017
+QDRANT_PORT=31333
+MINIO_PORT=31900
+MINIO_CONSOLE_PORT=31901
 ```
 
 **Modo standalone** (sin devcontainer integration):
@@ -186,10 +191,10 @@ powershell.exe -NoProfile -Command "wsl -d docker-desktop -- df -h /"
 wsl -d docker-desktop -- rm -rf /root/.vscode-remote-containers /root/.vscode-server
 ```
 
-**Prevencion automatica**: El template incluye `initializeCommand` en formato array que limpia residuos antes de cada build. Si estas usando una version anterior del template, agrega a tu `devcontainer.json`:
+**Prevencion automatica**: El template incluye `initializeCommand` que ejecuta `initialize.sh` — un script cross-platform que detecta si esta en Windows/WSL y limpia residuos antes de cada build. Si estas usando una version anterior del template, agrega a tu `devcontainer.json`:
 
 ```jsonc
-"initializeCommand": ["wsl", "-d", "docker-desktop", "--", "rm", "-rf", "/root/.vscode-remote-containers/bin/", "/root/.vscode-server/"]
+"initializeCommand": "bash .devcontainer/initialize.sh"
 ```
 
 **Limpieza adicional** (si el disco de datos de Docker tambien esta lleno):
@@ -213,9 +218,13 @@ docker inspect <container> --format '{{json .NetworkSettings.Networks}}'
 
 ### Healthcheck `unhealthy` en servicios de terceros
 
-Algunas imagenes Docker (Evolution API, Chatwoot, Alpine-based) no incluyen `curl`. Si un healthcheck con `curl -f` falla con "executable not found", usa alternativas:
+Algunas imagenes Docker (Qdrant, Evolution API, Chatwoot, Alpine-based) no incluyen `curl`. Si un healthcheck con `curl -f` falla con "executable not found", usa alternativas:
 
 ```yaml
+# bash /dev/tcp (funciona en cualquier imagen con bash, sin curl ni wget)
+# Ideal para imagenes minimales como qdrant/qdrant
+test: ["CMD-SHELL", "timeout 2 bash -c 'echo > /dev/tcp/localhost/6333' || exit 1"]
+
 # wget (disponible en la mayoria de imagenes)
 test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/"]
 
