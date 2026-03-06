@@ -179,15 +179,17 @@ powershell.exe -NoProfile -Command "wsl -d docker-desktop -- df -h /"
 # Si muestra 100% — este es el problema
 ```
 
-**Solucion automatica**: El template incluye `initializeCommand` que limpia automaticamente antes de cada build. Si estas usando una version anterior del template, agrega a tu `devcontainer.json`:
+**Limitacion**: VS Code intenta instalar el VS Code Server en la VM WSL **antes** de ejecutar `initializeCommand`. Por eso el `initializeCommand` del template solo limpia residuos del intento anterior — ayuda en el **segundo** rebuild, no en el primero.
 
-```jsonc
-"initializeCommand": "bash .devcontainer/initialize.sh"
+**Solucion (primera vez)** — ejecutar manualmente antes del rebuild:
+```bash
+wsl -d docker-desktop -- rm -rf /root/.vscode-remote-containers /root/.vscode-server
 ```
 
-**Solucion manual**:
-```bash
-powershell.exe -NoProfile -Command "wsl -d docker-desktop -- rm -rf /root/.vscode-remote-containers/bin/"
+**Prevencion automatica**: El template incluye `initializeCommand` en formato array que limpia residuos antes de cada build. Si estas usando una version anterior del template, agrega a tu `devcontainer.json`:
+
+```jsonc
+"initializeCommand": ["wsl", "-d", "docker-desktop", "--", "rm", "-rf", "/root/.vscode-remote-containers/bin/", "/root/.vscode-server/"]
 ```
 
 **Limpieza adicional** (si el disco de datos de Docker tambien esta lleno):
