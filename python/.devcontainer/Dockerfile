@@ -4,6 +4,9 @@ ARG TZ
 ENV TZ="$TZ"
 
 # Essential system tools + Chromium + Playwright deps
+# Build essentials: native pip packages (Pillow, cryptography, psycopg2, etc.)
+# Chromium: full browser for Chrome DevTools MCP (browser automation, screenshots, accessibility snapshots)
+# OPTIONAL (uncomment): postgresql-client, default-mysql-client, redis-tools, netcat-traditional
 RUN apt-get update && apt-get install -y --no-install-recommends \
   less \
   git \
@@ -16,11 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   ca-certificates \
   curl \
   sqlite3 \
-  # Build essentials (native pip packages: Pillow, cryptography, psycopg2, etc.)
   build-essential \
-  # Chromium: full browser for Chrome DevTools MCP
   chromium \
-  # Chromium/Playwright shared dependencies
   libnss3 \
   libatk1.0-0 \
   libatk-bridge2.0-0 \
@@ -38,15 +38,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libatspi2.0-0 \
   libxshmfence1 \
   fonts-liberation \
-  ## -----------------------------------------------------------
-  ## OPTIONAL: Uncomment what you need for your stack
-  ## -----------------------------------------------------------
-  ## DB clients (debug from inside container without external tools)
-  # postgresql-client \
-  # default-mysql-client \
-  # redis-tools \
-  ## Network debug
-  # netcat-traditional \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Node.js 22 (Claude Code requires modern Node — Debian apt ships Node 18 EOL)
@@ -84,7 +75,7 @@ USER $USERNAME
 
 # Python: no virtualenv needed in container, install direct
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
-ENV PATH=$PATH:/home/$USERNAME/.local/bin
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/dev/.local/bin
 
 # Shell
 ENV SHELL=/bin/zsh
