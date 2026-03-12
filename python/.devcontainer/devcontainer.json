@@ -8,6 +8,7 @@
       "CLAUDE_CODE_VERSION": "latest"
     }
   },
+  "userEnvProbe": "none",
   "runArgs": [
     "--security-opt", "seccomp=unconfined"
   ],
