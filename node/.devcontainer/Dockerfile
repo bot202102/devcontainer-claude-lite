@@ -1,4 +1,4 @@
-FROM node:22
+FROM node:22-slim
 
 ARG TZ
 ENV TZ="$TZ"
@@ -75,7 +75,7 @@ WORKDIR /workspace
 # to prevent blocking postCreateCommand when offline or during first setup
 ENV COREPACK_ENABLE_AUTO_PIN=0
 ENV COREPACK_ENABLE_STRICT=0
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
 USER node
 

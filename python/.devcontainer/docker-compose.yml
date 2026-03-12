@@ -12,9 +12,10 @@
 # Or use standalone (without devcontainer integration):
 #   docker compose -f .devcontainer/docker-compose.yml up -d
 #
-# IMPORTANT: requirements.txt is installed at build time (in the Dockerfile)
-# so ALL services (app, workers, etc.) get the Python dependencies.
-# postCreateCommand re-runs pip install for dev updates on the main service.
+# IMPORTANT: Dev Containers features break COPY in Dockerfiles (the CLI
+# overrides the build context). Python deps are installed via postCreateCommand
+# for the app service. Worker services must install deps at startup — see
+# the worker example below.
 #
 # PORT CONFLICTS: If you run multiple devcontainers simultaneously, use unique
 # port ranges per project via env vars. Example in .env:
@@ -47,18 +48,23 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    # env_file:
+    #   - ../.env
     # depends_on:
     #   postgres:
     #     condition: service_healthy
     #   redis:
     #     condition: service_healthy
     # environment:
+    #   PYTHONUNBUFFERED: "1"
     #   DATABASE_URL: postgresql://devuser:devpass@postgres:5432/devdb
     #   REDIS_URL: redis://:devpass@redis:6379
 
   ## ---------------------------------------------------------
-  ## Worker example — uncomment and adapt to your task runner
-  ## Uses the same image as app, so it has all Python deps.
+  ## Worker example — uncomment and adapt to your task runner.
+  ## Dev Containers features break COPY in Dockerfiles, so deps
+  ## are NOT baked into the image. The worker installs them at
+  ## startup via bash -c before running the actual command.
   ## ---------------------------------------------------------
   # worker:
   #   build:
@@ -68,20 +74,28 @@ services:
   #       TZ: ${TZ:-America/Lima}
   #   volumes:
   #     - ..:/workspace:cached
-  #   command: python -m celery -A myapp worker --loglevel=info
+  #   command: bash -c "pip install --no-cache-dir -r requirements.txt && celery -A myapp worker --loglevel=info"
+  #   env_file:
+  #     - ../.env
   #   environment:
+  #     PYTHONUNBUFFERED: "1"
   #     REDIS_URL: redis://:devpass@redis:6379
   #   depends_on:
   #     redis:
   #       condition: service_healthy
+  #   deploy:
+  #     replicas: 1
+  #     resources:
+  #       limits:
+  #         memory: 2G
 
   ## ---------------------------------------------------------
   ## PostgreSQL — uncomment to enable
-  ## Use pgvector/pgvector:pg16 if your app needs vector search
+  ## Use pgvector/pgvector:pg17 if your app needs vector search
   ## (required by Chatwoot, Supabase, and many AI/RAG apps)
   ## ---------------------------------------------------------
   # postgres:
-  #   image: postgres:16-alpine
+  #   image: postgres:17-alpine
   #   restart: unless-stopped
   #   environment:
   #     POSTGRES_USER: devuser

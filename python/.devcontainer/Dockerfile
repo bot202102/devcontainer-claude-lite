@@ -96,10 +96,13 @@ RUN echo 'export HISTFILE=/commandhistory/.zsh_history' >> ~/.zshrc && \
   echo 'autoload -Uz compinit && compinit' >> ~/.zshrc && \
   echo 'PROMPT="%F{green}%~%f %# "' >> ~/.zshrc
 
-# NOTE: Do NOT use COPY to bake requirements.txt into the image.
-# Dev Containers CLI overrides the build context when generating Dockerfile-with-features,
-# so any COPY referencing project files will fail with "no such file or directory".
-# Instead, install deps via postCreateCommand in devcontainer.json.
+# NOTE: Dev Containers CLI overrides the build context when generating
+# Dockerfile-with-features, so COPY referencing project files will fail
+# with "no such file or directory" for the app service.
+# Install deps via postCreateCommand in devcontainer.json instead.
+# Worker services (built by Docker Compose without features) CAN use COPY,
+# but the simplest approach is a startup pip install in the worker command.
+# See docker-compose.yml worker example for details.
 
 # Claude Code (needs npm)
 ARG CLAUDE_CODE_VERSION=latest

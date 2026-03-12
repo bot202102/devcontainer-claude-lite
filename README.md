@@ -10,7 +10,7 @@ Claude escribe todo el codigo. ESLint, Prettier y formatOnSave son CPU desperdic
 
 | Stack | Carpeta | Imagen base | Incluye |
 |---|---|---|---|
-| Node.js | `node/` | `node:22` | npm, pnpm (corepack), Node 22, Chromium (MCP) |
+| Node.js | `node/` | `node:22-slim` | pnpm (corepack), Node 22, Chromium (MCP) |
 | Python | `python/` | `python:3.12-slim` | pip, Python 3.12, sqlite3, Node 22 (para Claude Code), Chromium (MCP) |
 
 ## Que tienen todos en comun
@@ -33,17 +33,15 @@ Claude escribe todo el codigo. ESLint, Prettier y formatOnSave son CPU desperdic
 - Puertos parametrizables via env vars (evita conflictos entre proyectos)
 - `build-essential` incluido (compilacion de paquetes nativos: sharp, Pillow, bcrypt, etc.)
 
-## Python: deps baked into image
+## Python: deps via postCreateCommand
 
-El template Python instala `requirements.txt` **en el Dockerfile** (no solo en `postCreateCommand`). Esto garantiza que TODOS los servicios de docker-compose (app, workers, schedulers, etc.) tengan las dependencias Python disponibles.
+Dev Containers CLI overrides the build context when generating Dockerfile-with-features, so `COPY` referencing project files fails with "no such file or directory". Python deps se instalan via `postCreateCommand` en el servicio `app`.
 
-`postCreateCommand` sigue corriendo `pip install` como fallback para actualizar deps sin rebuild.
+Para **worker services** (que no reciben `postCreateCommand`), el docker-compose.yml incluye un ejemplo que instala deps al inicio via `bash -c "pip install ... && ..."`. Es ligeramente mas lento al arrancar pero evita la complejidad de Dockerfiles separados.
 
 ```
-Build context = ".." (workspace root)
-  -> Dockerfile COPY requirements.txt (si existe)
-  -> pip install en la imagen
-  -> Todos los servicios comparten la misma imagen con deps
+postCreateCommand: pip install -r requirements.txt (app service)
+worker command: bash -c "pip install ... && celery ..." (worker services)
 ```
 
 ## Que se elimino vs el original de Anthropic
@@ -93,7 +91,7 @@ El `docker-compose.yml` incluido trae servicios comunes comentados. Descomenta l
 
 ```yaml
 # En .devcontainer/docker-compose.yml, descomenta:
-postgres:    # PostgreSQL 16
+postgres:    # PostgreSQL 17
 redis:       # Redis 7
 mysql:       # MySQL 8 (alternativa a PostgreSQL)
 mongo:       # MongoDB 7
@@ -273,13 +271,26 @@ test: ["CMD-SHELL", "pg_isready -U user -d db"]
 test: ["CMD", "redis-cli", "ping"]
 ```
 
+### `npm notice` messages when using pnpm
+
+**Causa**: Usar `npx` en lugar de `pnpm exec` en scripts de post-start o comandos invoca npm internamente, mostrando mensajes `npm notice` confusos.
+
+**Solucion**: En proyectos con pnpm, usar siempre `pnpm exec` en lugar de `npx`:
+```bash
+# MAL — muestra npm notices
+npx prisma generate
+
+# BIEN — usa pnpm directamente
+pnpm exec prisma generate
+```
+
 ### PostgreSQL: `extension "vector" is not available`
 
 Apps modernas (Chatwoot, Supabase, RAG pipelines) requieren pgvector. Cambia la imagen:
 
 ```yaml
 postgres:
-  image: pgvector/pgvector:pg16  # en lugar de postgres:16-alpine
+  image: pgvector/pgvector:pg17  # en lugar de postgres:16-alpine
 ```
 
 ## Requisitos

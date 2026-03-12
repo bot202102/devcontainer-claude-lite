@@ -44,6 +44,8 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    # env_file:
+    #   - ../.env
     # depends_on:
     #   postgres:
     #     condition: service_healthy
@@ -55,11 +57,11 @@ services:
 
   ## ---------------------------------------------------------
   ## PostgreSQL — uncomment to enable
-  ## Use pgvector/pgvector:pg16 if your app needs vector search
+  ## Use pgvector/pgvector:pg17 if your app needs vector search
   ## (required by Chatwoot, Supabase, and many AI/RAG apps)
   ## ---------------------------------------------------------
   # postgres:
-  #   image: postgres:16-alpine
+  #   image: postgres:17-alpine
   #   restart: unless-stopped
   #   environment:
   #     POSTGRES_USER: devuser
