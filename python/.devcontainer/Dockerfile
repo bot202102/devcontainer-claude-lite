@@ -96,15 +96,10 @@ RUN echo 'export HISTFILE=/commandhistory/.zsh_history' >> ~/.zshrc && \
   echo 'autoload -Uz compinit && compinit' >> ~/.zshrc && \
   echo 'PROMPT="%F{green}%~%f %# "' >> ~/.zshrc
 
-# Python deps: bake into image so ALL compose services (workers, etc.) get them.
-# postCreateCommand only runs on the main devcontainer service.
-# The glob trick (post-start.s[h]) guarantees COPY won't fail if requirements.txt
-# doesn't exist yet — at least one file always matches.
-# Context must be ".." (workspace root) — see devcontainer.json and docker-compose.yml.
-COPY --chown=$USERNAME .devcontainer/post-start.s[h] requirements.tx[t] /tmp/deps/
-RUN if [ -f /tmp/deps/requirements.txt ]; then \
-      pip install --no-cache-dir -r /tmp/deps/requirements.txt; \
-    fi && rm -rf /tmp/deps
+# NOTE: Do NOT use COPY to bake requirements.txt into the image.
+# Dev Containers CLI overrides the build context when generating Dockerfile-with-features,
+# so any COPY referencing project files will fail with "no such file or directory".
+# Instead, install deps via postCreateCommand in devcontainer.json.
 
 # Claude Code (needs npm)
 ARG CLAUDE_CODE_VERSION=latest
