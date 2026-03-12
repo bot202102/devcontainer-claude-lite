@@ -91,7 +91,7 @@ USER node
 
 # Node/npm globals
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
-ENV PATH=$PATH:/usr/local/share/npm-global/bin
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/share/npm-global/bin
 
 # Shell
 ENV SHELL=/bin/zsh
