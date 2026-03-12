@@ -11,7 +11,7 @@ Claude escribe todo el codigo. ESLint, Prettier y formatOnSave son CPU desperdic
 | Stack | Carpeta | Imagen base | Incluye |
 |---|---|---|---|
 | Node.js | `node/` | `node:22-slim` | pnpm (corepack), Node 22, Chromium (MCP) |
-| Python | `python/` | `python:3.12-slim` | pip, Python 3.12, sqlite3, Node 22 (para Claude Code), Chromium (MCP) |
+| Python | `python/` | `python:3.12-slim` | uv, Python 3.12, sqlite3, Node 22 (para Claude Code), Chromium (MCP) |
 
 ## Que tienen todos en comun
 
@@ -33,15 +33,17 @@ Claude escribe todo el codigo. ESLint, Prettier y formatOnSave son CPU desperdic
 - Puertos parametrizables via env vars (evita conflictos entre proyectos)
 - `build-essential` incluido (compilacion de paquetes nativos: sharp, Pillow, bcrypt, etc.)
 
-## Python: deps via postCreateCommand
+## Python: uv en lugar de pip
+
+El template usa [uv](https://docs.astral.sh/uv/) en lugar de pip. pip falla con `resolution-too-deep` en proyectos con grafos de dependencias complejos (LangChain, etc.). uv resuelve estos grafos en segundos.
 
 Dev Containers CLI overrides the build context when generating Dockerfile-with-features, so `COPY` referencing project files fails with "no such file or directory". Python deps se instalan via `postCreateCommand` en el servicio `app`.
 
-Para **worker services** (que no reciben `postCreateCommand`), el docker-compose.yml incluye un ejemplo que instala deps al inicio via `bash -c "pip install ... && ..."`. Es ligeramente mas lento al arrancar pero evita la complejidad de Dockerfiles separados.
+Para **worker services** (que no reciben `postCreateCommand`), el docker-compose.yml incluye un ejemplo que instala deps al inicio via `bash -c "uv pip install ... && ..."`. Es ligeramente mas lento al arrancar pero evita la complejidad de Dockerfiles separados.
 
 ```
-postCreateCommand: pip install -r requirements.txt (app service)
-worker command: bash -c "pip install ... && celery ..." (worker services)
+postCreateCommand: uv pip install -r requirements.txt (app service)
+worker command: bash -c "uv pip install ... && celery ..." (worker services)
 ```
 
 ## Que se elimino vs el original de Anthropic

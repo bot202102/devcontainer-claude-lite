@@ -74,7 +74,7 @@ services:
   #       TZ: ${TZ:-America/Lima}
   #   volumes:
   #     - ..:/workspace:cached
-  #   command: bash -c "pip install --no-cache-dir -r requirements.txt && celery -A myapp worker --loglevel=info"
+  #   command: bash -c "uv pip install -r requirements.txt && celery -A myapp worker --loglevel=info"
   #   env_file:
   #     - ../.env
   #   environment:

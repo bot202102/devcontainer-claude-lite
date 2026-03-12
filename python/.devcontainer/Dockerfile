@@ -73,8 +73,12 @@ RUN mkdir -p /workspace /home/$USERNAME/.claude /home/$USERNAME/.vscode-server &
 WORKDIR /workspace
 USER $USERNAME
 
+# uv (fast Python package installer — pip can't resolve complex dep graphs)
+RUN sudo pip install --no-cache-dir uv
+
 # Python: no virtualenv needed in container, install direct
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
+ENV UV_SYSTEM_PYTHON=1
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/dev/.local/bin
 
 # Shell
