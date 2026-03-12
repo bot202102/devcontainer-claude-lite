@@ -26,6 +26,8 @@ Claude escribe todo el codigo. ESLint, Prettier y formatOnSave son CPU desperdic
 - `postCreateCommand` auto-instala dependencias (detecta pnpm/npm/pip)
 - `initializeCommand` limpia VS Code Server viejo de la VM Docker Desktop (previene "No space left on device")
 - `postStartCommand` aplica fixes de Docker Desktop (`.gitconfig` como directorio, `safe.directory`)
+- `userEnvProbe: "none"` para evitar inyeccion de PATH del host
+- PATH hardcodeado en Dockerfile (previene rotura al construir desde WSL)
 - File watcher excludes para reducir CPU del IDE
 - Healthcheck de red en el servicio `app` (detecta perdida silenciosa de conectividad)
 - Puertos parametrizables via env vars (evita conflictos entre proyectos)
@@ -172,6 +174,44 @@ El container incluye Chromium completo. Para usarlo con Claude Code, agrega a tu
 ```
 
 ## Troubleshooting
+
+### Build falla con `Syntax error - can't find = in "Files/Git/mingw64/bin"` (WSL)
+
+**Causa**: VS Code Dev Containers CLI inyecta el PATH del host WSL (que incluye rutas Windows con espacios como `/mnt/c/Program Files/...`) al generar el Dockerfile-with-features interno. Si el Dockerfile usa `ENV PATH=$PATH:...`, el CLI expande `$PATH` con la ruta completa del host y Docker no puede parsear los espacios.
+
+**Solucion**: El template ya tiene PATH hardcodeado en los Dockerfiles. Si usas una version anterior, reemplaza:
+```dockerfile
+# MAL — el CLI expande $PATH con rutas Windows
+ENV PATH=$PATH:/usr/local/share/npm-global/bin
+
+# BIEN — inmune a la inyeccion
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/share/npm-global/bin
+```
+
+Ademas, `devcontainer.json` incluye `"userEnvProbe": "none"` para minimizar la contaminacion del entorno del host.
+
+**Nota**: `userEnvProbe: "none"` solo afecta el probe del lado del container. El probe del host (donde ocurre la inyeccion) pasa antes de leer `devcontainer.json`. Por eso el PATH hardcodeado es la solucion real.
+
+### Build falla con `unknown instruction: postgresql-client` o paquete como instruccion Docker
+
+**Causa**: Los comentarios inline dentro de lineas con continuacion `\` en un `RUN` de Docker rompen el procesamiento del CLI de Dev Containers. Al generar el Dockerfile-with-features, el CLI colapsa las lineas y los `#` comentan el resto, causando que el paquete siguiente aparezca como una instruccion Docker desconocida.
+
+**Solucion**: No poner comentarios inline dentro de bloques `RUN` con `\`. Mover los comentarios arriba del `RUN`:
+```dockerfile
+# BIEN — comentarios antes del RUN
+# Build essentials: native npm packages (node-gyp, sharp, bcrypt)
+RUN apt-get install -y \
+  build-essential \
+  python3 \
+  && apt-get clean
+
+# MAL — comentarios inline rompen el Dockerfile-with-features
+RUN apt-get install -y \
+  # Build essentials
+  build-essential \
+  python3 \
+  && apt-get clean
+```
 
 ### Rebuild falla con "No space left on device" (Docker Desktop / Windows)
 
