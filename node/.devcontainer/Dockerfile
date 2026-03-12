@@ -4,6 +4,9 @@ ARG TZ
 ENV TZ="$TZ"
 
 # Essential system tools + Playwright/Chromium dependencies
+# Build essentials: native npm packages (node-gyp, sharp, bcrypt, etc.)
+# Chromium: full browser for Chrome DevTools MCP (browser automation, screenshots, accessibility snapshots)
+# OPTIONAL (uncomment): postgresql-client, default-mysql-client, redis-tools, netcat-traditional
 RUN apt-get update && apt-get install -y --no-install-recommends \
   less \
   git \
@@ -15,13 +18,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   nano \
   ca-certificates \
   curl \
-  # Build essentials (native npm packages: node-gyp, sharp, bcrypt, etc.)
   build-essential \
   python3 \
-  # Chromium: full browser for Chrome DevTools MCP (not just libs)
-  # Gives you browser automation, screenshots, accessibility snapshots
   chromium \
-  # Chromium/Playwright shared dependencies
   libnss3 \
   libatk1.0-0 \
   libatk-bridge2.0-0 \
@@ -39,15 +38,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libatspi2.0-0 \
   libxshmfence1 \
   fonts-liberation \
-  ## -----------------------------------------------------------
-  ## OPTIONAL: Uncomment what you need for your stack
-  ## -----------------------------------------------------------
-  ## DB clients (debug from inside container without external tools)
-  # postgresql-client \
-  # default-mysql-client \
-  # redis-tools \
-  ## Network debug
-  # netcat-traditional \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Docker CLI (uses host's Docker via socket)
