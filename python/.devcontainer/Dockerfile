@@ -71,10 +71,11 @@ RUN mkdir -p /workspace /home/$USERNAME/.claude /home/$USERNAME/.vscode-server &
   chown -R $USERNAME:$USERNAME /workspace /home/$USERNAME/.claude /home/$USERNAME/.vscode-server
 
 WORKDIR /workspace
-USER $USERNAME
 
-# uv (fast Python package installer — pip can't resolve complex dep graphs)
-RUN sudo pip install --no-cache-dir uv
+# uv (fast Python package installer — standalone binary, no pip dependency)
+RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
+
+USER $USERNAME
 
 # Python: no virtualenv needed in container, install direct
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
