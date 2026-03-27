@@ -41,5 +41,11 @@ if [ -S /var/run/docker.sock ]; then
   fi
 fi
 
+# Fix: Claude Code plugins download scripts without execute permission.
+# This causes hook errors like "Permission denied" for ralph-loop, hookify, etc.
+if [ -d "$HOME/.claude/plugins/cache" ]; then
+  find "$HOME/.claude/plugins/cache" -name "*.sh" ! -perm -u+x -exec chmod +x {} + 2>/dev/null
+fi
+
 # Bind-mounted workspaces may have different uid — mark as safe
 git config --global safe.directory /workspace 2>/dev/null || true
