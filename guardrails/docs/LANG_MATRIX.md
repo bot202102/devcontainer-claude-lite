@@ -6,6 +6,11 @@ Cada checker en `.claude/hooks/lang/<lang>.sh` implementa una heurística para d
 El invariante es agnóstico. El mecanismo varía según el build system y la
 filosofía de visibilidad de cada lenguaje.
 
+Adicionalmente hay **detectores orthogonales** que atacan otras clases de fake-work:
+
+- `sql-drift-drizzle.sh` — raw SQL que referencia tablas inexistentes en el schema de Drizzle.
+- `silencer-detect.sh` — `try { await …dbCall… } catch { /* empty */ }` patrones que silencian errores críticos. Ver la sección "Silencer anti-pattern".
+
 ## Baseline format
 
 El archivo `.claude/ghost-baseline.txt` usa el formato **`file:symbol`** (una línea por ghost aceptado). La línea de declaración del símbolo NO se incluye en la clave — solo el archivo y el nombre del símbolo.
@@ -300,6 +305,75 @@ Como el ghost checker, funciona mejor con una **baseline** — pero ese patrón 
 ### Archivos
 
 - `.claude/hooks/lang/sql-drift-drizzle.sh` — checker
+
+## Silencer anti-pattern (detección orthogonal)
+
+### Motivación — caso real
+
+En un consumer repo, esta pieza de SSR Astro silenció un HTTP 500 por 11 días:
+
+```ts
+// dashboard/index.astro
+try {
+  pastorDashboardData = await getPastorDashboardData(tenantId);
+} catch {
+  // Fallback — client will fetch
+}
+```
+
+La query debajo estaba rota (raw SQL con nombre de tabla inválido). El `catch {}` tragó el error. El cliente fetcheó el mismo endpoint roto, también obtuvo 500, y mostró empty state. 14+ usuarios trataron "dashboard vacío" como "no hay datos aún" durante 11 días. Ningún alert, ningún ticket — hasta que alguien revisó los logs del container.
+
+### Mecanismo
+
+`silencer-detect.sh` es un state-machine awk que escanea `.ts/.tsx/.js/.jsx/.astro`:
+
+1. **Estado 0**: busca líneas como `try {` o `try\s*$` (con brace en línea siguiente).
+2. **Estado 1** (dentro del try): busca indicadores de producción data-call:
+   - `await` (genérico)
+   - `.query(` (pg, knex, …)
+   - `` sql` `` (drizzle template)
+   - `fetch(`, `.request(`, `.send(`
+   - imports desde `@/lib/db/queries`
+3. Al encontrar `} catch {` (con o sin param), pasa a **Estado 2**.
+4. **Estado 2** (dentro del catch): clasifica cada línea:
+   - `}` solo → catch vacío. Si había DB indicator en try → emite finding.
+   - Solo comentarios (`//`, `*`, `/*`, `*/`) → catch "silenciado" (mismo trato).
+   - Cualquier código real (log, throw, set-state) → NO silenciado. Estado vuelve a 0.
+
+### Output
+
+```
+src/pages/dashboard/index.astro:39:silenced-data-call
+src/components/core/OfflineIndicator.tsx:33:silenced-data-call
+```
+
+Una línea por silencer detectado, apuntando al `try` donde empezó.
+
+### Qué NO atrapa
+
+- `catch (e) { /* ignore */ throw new Error('different'); }` — el throw lo rescata (OK, no es silenciador).
+- `catch { return defaultValue; }` — código real presente. Marcado como no-silenciado. (Defensive pero no silencioso — el caller ve `defaultValue` distinto del resultado OK.)
+- `try { fetch(…) }` sin `await` — async fire-and-forget. La promesa rejected puede caer en `unhandledRejection`, no en el catch. Falsa sensación de cobertura. Este checker lo flaggea igualmente porque el `fetch(` indicator hace match.
+
+### Limitaciones
+
+- **Graceful degrade intencional** — en frontend, `try { read-from-IndexedDB } catch { // not available }` es pragmático y válido. El checker NO distingue. Output requiere triage humano: aceptar los legítimos, arreglar los que realmente ocultan bugs.
+- **Catches con `console.error`** — marcados como no-silenciados (hay código real), pero si el console.error nunca se revisa en prod, sigue siendo silencioso de facto. Sólo un sistema de alerting real resuelve esto (fuera del alcance del checker).
+- **Server-side swallows sin logging** — el caso real del incidente. **Este es el objetivo primario del checker.** Si el try hace `await dbQuery()` + el catch está vacío o solo con comment, algo probablemente está mal.
+
+### Invocación
+
+No está cableado como hook por defecto (sería demasiado ruido en la mayoría de proyectos existentes). Uso manual o como step adicional de CI:
+
+```bash
+bash .claude/hooks/lang/silencer-detect.sh
+```
+
+Consumidores pueden integrar como SessionStart informational o Stop blocking una vez triageados los legítimos a través de un `baseline`-like list.
+
+### Archivos
+
+- `.claude/hooks/lang/silencer-detect.sh` — checker
 
 ## Go
 
