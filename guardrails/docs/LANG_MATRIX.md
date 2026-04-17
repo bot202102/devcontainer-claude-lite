@@ -241,6 +241,100 @@ fin de turno.
 
 - `.claude/hooks/lang/astro.sh` — checker
 
+## Next.js (App Router)
+
+### Por qué un checker separado de `node` y `astro`
+
+Next.js 13+ con App Router también es **file-based routing**, pero las
+convenciones difieren de Astro:
+
+- Los roots viven en `src/app/**` (o `app/**` sin carpeta `src/`), no en
+  `src/pages/` — aunque Next.js mantiene `pages/` como soporte legacy
+- Archivos-rol por convención de nombre dentro de `app/`:
+  `page.{ts,tsx}`, `layout.{ts,tsx}`, `route.{ts,js}`,
+  `loading.{ts,tsx}`, `error.{ts,tsx}`, `not-found.{ts,tsx}`,
+  `template.{ts,tsx}`
+- La configuración es `next.config.{js,mjs,ts,cjs}`, no `astro.config.*`
+- Middleware va en `middleware.ts` en la raíz (o en `src/middleware.ts`)
+- Observability en `instrumentation.{ts,js}` (si se usa)
+- Route handlers exportan símbolos con nombres-contrato del runtime que NO
+  son "llamados" por código propio: `GET`/`POST`/`PUT`/`DELETE`/`PATCH`/
+  `OPTIONS`/`HEAD`, `generateMetadata`, `generateStaticParams`,
+  `generateViewport`, `metadata`, `viewport`, `revalidate`, `dynamic`,
+  `dynamicParams`, `runtime`, `preferredRegion`, `maxDuration`, `default`
+  (el page/layout/route handler en sí)
+
+`nextjs.sh` hereda el modelo de `astro.sh` — corpus de tokens + exclusión
+self-hit — pero con estas diferencias:
+
+1. Excluye `src/app/**` y `src/pages/**` del set de "definidores"
+2. Archivos `.astro` no aplican; escanea `.ts/.tsx/.js/.jsx/.mjs/.cjs`
+3. Busca archivos root-level en la raíz del proyecto Y en el padre de
+   `SRC_GLOBS` (útil para monorepos donde `SRC_GLOBS=apps/web/src` y
+   `next.config.js` vive en `apps/web/`)
+4. Skip list incluye los nombres-contrato del runtime de Next.js
+
+### Mecanismo
+
+```bash
+# 1. Definidores: src/**.{ts,tsx,js,jsx,mjs,cjs} fuera de app/, pages/, tests
+find "$SRC_ROOT" -type f \( -name '*.ts' -o -name '*.tsx' -o ... \) \
+    | grep -v "^${SRC_ROOT}/app/" \
+    | grep -v "^${SRC_ROOT}/pages/" \
+    | grep -vE '\.test\.|\.spec\.|__tests__|__mocks__|\.d\.ts$'
+
+# 2. Extraer exports top-level via heurística grep/awk
+#    (igual que astro.sh)
+
+# 3. Corpus: todo $SRC_ROOT (incluye app + pages) + archivos raíz Next.js
+for root_file in middleware.{ts,js} next.config.{js,mjs,ts,cjs} instrumentation.{ts,js}; do
+    [ -f "$root_file" ] && echo "$root_file" >> "$CORPUS"
+    [ -f "$SRC_PARENT/$root_file" ] && echo "$SRC_PARENT/$root_file" >> "$CORPUS"
+done
+
+# 4. Tokenizar + detectar ghosts con skip-list de convenciones Next
+```
+
+### Entry-points auto-detectados
+
+`nextjs.sh` ignora `ENTRY_POINTS` del config igual que `astro.sh`. Los
+roots son, en orden de prioridad:
+
+- `$SRC_GLOBS/app/**/{page,layout,route,loading,error,not-found,template}.{ts,tsx,js,jsx}`
+- `$SRC_GLOBS/pages/**` (legacy pages router, si coexiste)
+- `middleware.{ts,js}` en raíz del proyecto o padre de `$SRC_GLOBS`
+- `next.config.{js,mjs,ts,cjs}` en raíz o padre
+- `instrumentation.{ts,js}` en raíz o padre
+
+Si tu proyecto usa un root no estándar (p.ej. `apps/web/src` en un monorepo
+Turborepo), configura `SRC_GLOBS=apps/web/src`.
+
+### Limitaciones específicas
+
+- **`import type` de TypeScript**: identificadores usados solo en posición
+  de tipo pueden producir falsos positivos. Baseline los absorbe.
+- **Path aliases (`@/components`)**: el tokenizer ve el símbolo importado
+  pero no resuelve la ruta. Si alguien importa `@/lib/foo` y `foo` nunca
+  aparece por nombre en otro archivo, flagea. En la práctica casi siempre
+  hay un consumer con `import { foo } from '@/lib/foo'` que sí contiene
+  el token.
+- **React Server Components con `"use server"`**: funcionan como cualquier
+  export tipo función; si son invocadas desde un client component, el
+  tokenizer las detecta.
+- **Route handlers solos**: un `app/api/foo/route.ts` que solo exporta
+  `GET`/`POST` no define símbolos reusables — el filtro "excluir app/**"
+  del set de definidores lo evita.
+
+### Entry-point candidates
+
+- No aplicable — auto-detectados. `ENTRY_POINTS` del `project.conf` es
+  informativo.
+
+### Archivos
+
+- `.claude/hooks/lang/nextjs.sh` — checker
+
+
 ## Schema-SQL drift (Drizzle) — defense class complementaria
 
 ### Por qué un checker orthogonal al ghost checker
