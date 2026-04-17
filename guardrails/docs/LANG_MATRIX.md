@@ -236,6 +236,71 @@ fin de turno.
 
 - `.claude/hooks/lang/astro.sh` — checker
 
+## Schema-SQL drift (Drizzle) — defense class complementaria
+
+### Por qué un checker orthogonal al ghost checker
+
+El ghost checker detecta **símbolos** (exports) sin call-site. No puede detectar un bug en el CONTENIDO de un string SQL. Un caso real:
+
+```ts
+// Drizzle schema declara:
+export const smallGroupMembers = pgTable('group_members', { ... });
+
+// Drizzle query (OK):
+await db.select().from(smallGroupMembers);   // resuelve a 'group_members'
+
+// Raw SQL template (ROTO):
+sql`... FROM small_group_members sgm ...`    // tabla inexistente, 500 en prod
+```
+
+El TS compiler ve `sql\`...\`` como string opaco. El ghost checker ve `smallGroupMembers` como wired. Nadie atrapa el bug hasta que la query corre — y en un incidente reciente, tardó 11 días.
+
+### Mecanismo
+
+```bash
+# 1. Extraer nombres reales de tablas desde pgTable('<name>', ...)
+grep -oE "pgTable[[:space:]]*\(['\"][^'\"]+['\"]" src/**/schema/*.ts | ...
+
+# 2. Scanear archivos con raw-SQL vehicles (sql` o .query() )
+# 3. Por archivo, detectar CTEs (WITH RECURSIVE name AS …) y agregarlos al set conocido.
+# 4. Extraer referencias FROM/JOIN/INTO/UPDATE <name> de cada archivo.
+# 5. Filtrar: líneas con comentarios JS, funciones SQL con FROM (EXTRACT, CAST).
+# 6. Diff: nombres referenciados que NO están en la unión de {tablas reales} ∪ {CTEs del archivo} ∪ {system tables} ∪ {SQL keywords} ∪ {prose comunes}.
+```
+
+### Invocación
+
+No es un hook por defecto (es complementario al ghost checker, no sustituto). Uso manual o integrable como SessionStart adicional:
+
+```bash
+bash .claude/hooks/lang/sql-drift-drizzle.sh
+# stdout: file:line:<referenced-name> por cada drift sospechoso
+```
+
+Config:
+- `SCHEMA_GLOBS` — dirs con `pgTable()` declarations. Default: `src/lib/db/schema src/db/schema drizzle/schema`.
+- `SRC_GLOBS` — dirs para scanear. Default: `src`.
+- `SQL_DRIFT_KNOWN_TABLES` — whitelist adicional (views, extension tables, CTEs no-detectados).
+
+### Limitaciones conocidas
+
+- **Heurística por regex, no parser SQL**. Detecta lo obvio; tiene ~10-30% FPs típicamente (prose en comments/strings JS que contienen "from X").
+- **No detecta bugs indirectos**. Si el nombre de la tabla viene de un string-builder o map (`ENTITY_TABLE_MAP[entityType]`), el string real nunca aparece literalmente en el código — el checker no puede resolverlo. Ejemplo: `FROM ${ENTITY_TABLE_MAP[entityType]}` con map que tiene un valor inválido.
+- **CTEs con alias en subquery**: si se usa `SELECT * FROM (SELECT …) AS sub_query` el `sub_query` se ve como tabla. Agrégalo a `SQL_DRIFT_KNOWN_TABLES` o al alias list.
+- **Interpolaciones `${var}`**: el checker NO intenta resolver JS template vars. Si dentro del template aparece `FROM ${dynamic_name}`, pasa desapercibido.
+
+### Caso de uso típico
+
+1. Primer run sobre un repo existente → ~N findings
+2. Triage humano: cuáles son reales vs CTE/alias/prose → extender `SQL_DRIFT_KNOWN_TABLES`
+3. Runs subsecuentes → el delta (findings nuevos no-esperados) es actionable
+
+Como el ghost checker, funciona mejor con una **baseline** — pero ese patrón se deja al consumidor.
+
+### Archivos
+
+- `.claude/hooks/lang/sql-drift-drizzle.sh` — checker
+
 ## Go
 
 ### Mecanismo
