@@ -1,79 +1,84 @@
 #!/usr/bin/env bash
-# java.sh — extract public classes/interfaces without import in the package
-# tree reachable from the entry-point class.
-#
-# Heuristic — Java reflection & Spring DI can hide dependencies.
-# Falsos positivos esperados con heavy reflection; falsos negativos raros.
-#
-# Contract: see guardrails/docs/LANG_MATRIX.md
+# java.sh — public classes/interfaces/enums without reachability.
+# POSIX-only, no ripgrep. Loud failure on missing tools.
 
-set -euo pipefail
+set -u
 
 SRC_GLOBS="${SRC_GLOBS:-}"
 TEST_EXCLUDES="${TEST_EXCLUDES:-}"
 
-if ! command -v rg >/dev/null 2>&1; then
-    echo "java.sh: ripgrep (rg) required" >&2
-    exit 0
+if [ -z "${ENTRY_POINTS:-}" ]; then
+    echo "java.sh: ENTRY_POINTS env var required (source project.conf first)" >&2
+    exit 1
 fi
 
-if [ -z "$SRC_GLOBS" ]; then
-    if [ -d "src/main/java" ]; then
-        SCAN_ARGS=(src/main/java)
-    else
-        SCAN_ARGS=(.)
+for bin in grep find awk; do
+    if ! command -v "$bin" >/dev/null 2>&1; then
+        echo "java.sh: required tool '$bin' not found in PATH" >&2
+        exit 1
     fi
-else
-    # shellcheck disable=SC2206
-    SCAN_ARGS=($SRC_GLOBS)
-fi
-
-EXCLUDES=(
-    --glob '!**/src/test/**'
-    --glob '!**/target/**'
-    --glob '!**/build/**'
-    --glob '!**/*Test.java'
-    --glob '!**/*Tests.java'
-    --glob '!**/*IT.java'
-)
-for extra in $TEST_EXCLUDES; do
-    EXCLUDES+=(--glob "!$extra")
 done
 
-# Extract public class/interface/enum definitions
-SYMBOLS=$(rg "${EXCLUDES[@]}" \
-    -t java \
-    -n --no-heading --with-filename \
-    'public\s+(class|interface|enum|record)\s+([A-Z][A-Za-z0-9_]*)' \
-    "${SCAN_ARGS[@]}" 2>/dev/null | \
-    sed -E 's|^([^:]+):([0-9]+):.*public\s+(class|interface|enum|record)\s+([A-Z][A-Za-z0-9_]*).*|\1:\2:\4|' || true)
+if [ -z "$SRC_GLOBS" ]; then
+    if [ -d "src/main/java" ]; then SCAN_ROOT="src/main/java"
+    else SCAN_ROOT="."
+    fi
+else
+    SCAN_ROOT="$SRC_GLOBS"
+fi
 
-[ -z "$SYMBOLS" ] && exit 0
+TMP_FILES=$(mktemp)
+TMP_SYMS=$(mktemp)
+trap 'rm -f "$TMP_FILES" "$TMP_SYMS"' EXIT
 
-# For each symbol, check reachability from ENTRY_POINTS
+find "$SCAN_ROOT" -type f -name '*.java' 2>/dev/null | \
+    grep -vE '(/src/test/|/target/|/build/|Test\.java$|Tests\.java$|IT\.java$)' > "$TMP_FILES"
+
+if [ -n "$TEST_EXCLUDES" ]; then
+    for pat in $TEST_EXCLUDES; do
+        grep -v -- "$pat" "$TMP_FILES" > "${TMP_FILES}.new" 2>/dev/null || cp "$TMP_FILES" "${TMP_FILES}.new"
+        mv "${TMP_FILES}.new" "$TMP_FILES"
+    done
+fi
+
+[ ! -s "$TMP_FILES" ] && exit 0
+
+while IFS= read -r file; do
+    awk -v file="$file" '
+        /public[[:space:]]+(class|interface|enum|record)[[:space:]]+[A-Z][A-Za-z0-9_]*/ {
+            match($0, /(class|interface|enum|record)[[:space:]]+[A-Z][A-Za-z0-9_]*/)
+            s = substr($0, RSTART, RLENGTH)
+            sub(/^(class|interface|enum|record)[[:space:]]+/, "", s)
+            sub(/[^A-Za-z0-9_].*$/, "", s)
+            if (length(s) > 0) print file ":" NR ":" s
+        }
+    ' "$file"
+done < "$TMP_FILES" > "$TMP_SYMS"
+
+[ ! -s "$TMP_SYMS" ] && exit 0
+
 while IFS= read -r line; do
     [ -z "$line" ] && continue
     symbol=$(echo "$line" | awk -F: '{print $NF}')
 
-    # Skip common names
     case "$symbol" in
-        Main|Application|Config|Error|Handler|Request|Response|Builder) continue ;;
+        Main|Application|Config|Error|Handler|Request|Response|Builder|String)
+            continue ;;
     esac
 
     found=0
     for ep in $ENTRY_POINTS; do
         [ ! -f "$ep" ] && continue
-        ep_dir=$(dirname "$ep")
-        # Check import + usage in ENTRY_POINTS and its package
-        if rg -q "\b$symbol\b" "$ep" 2>/dev/null; then
+        if grep -qw "$symbol" "$ep" 2>/dev/null; then
             found=1; break
         fi
-        if rg -q "\b$symbol\b" "$ep_dir" -t java 2>/dev/null; then
+        ep_dir=$(dirname "$ep")
+        if find "$ep_dir" -name '*.java' -type f 2>/dev/null | while IFS= read -r f; do
+            if grep -qw "$symbol" "$f" 2>/dev/null; then echo 1; break; fi
+        done | grep -q '1'; then
             found=1; break
         fi
     done
 
-    if [ $found -eq 0 ]; then
-        echo "$line"
-    fi
-done <<< "$SYMBOLS"
+    [ "$found" = "0" ] && echo "$line"
+done < "$TMP_SYMS"
