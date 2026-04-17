@@ -6,6 +6,27 @@ Cada checker en `.claude/hooks/lang/<lang>.sh` implementa una heurística para d
 El invariante es agnóstico. El mecanismo varía según el build system y la
 filosofía de visibilidad de cada lenguaje.
 
+## Baseline format
+
+El archivo `.claude/ghost-baseline.txt` usa el formato **`file:symbol`** (una línea por ghost aceptado). La línea de declaración del símbolo NO se incluye en la clave — solo el archivo y el nombre del símbolo.
+
+```
+src/lib/api/helpers.ts:ApiError
+src/lib/db/queries/prayer-requests.ts:PrayerRequestRow
+src/components/core/Sidebar.astro:NavItem
+```
+
+**Por qué symbol-based y no line-based**: un formato previo `file:line:symbol` era frágil — agregar un `import` en la línea 1 de un archivo shifteaba el número de línea de TODOS los símbolos debajo, generando N "ghosts nuevos" espúreos aunque ningún símbolo cambió realmente. El formato actual es line-independent: la identidad es (archivo, símbolo), no (archivo, línea, símbolo).
+
+**El output al usuario** (cuando el gate bloquea o reporta ghosts clearados) SÍ incluye el line number para navegación:
+```
+INTEGRATION GATE BLOCK: new public symbols have no call-site reachable from src/pages/.
+
+  src/lib/db/queries/newThing.ts:42:someNewGhost
+```
+
+**Migración automática**: si `integration-gate.sh` detecta un baseline en formato legacy (`file:line:symbol`), lo migra al nuevo formato en el próximo run — mensaje de log + baseline reescrito. Un consumidor con baseline pre-existente no necesita migrar manualmente; el proceso es idempotente y no bloquea.
+
 ## Contrato de cada checker
 
 **Input**: variables de entorno definidas en `project.conf`:
