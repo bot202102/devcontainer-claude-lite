@@ -1,0 +1,37 @@
+# .claude/hooks/project.conf
+#
+# Project-specific config for integration gates.
+# Copy this to project.conf (same dir) and edit.
+#
+# See guardrails/README.md for the problem this solves.
+# See guardrails/docs/LANG_MATRIX.md for per-language mechanics.
+#
+# Required: LANG + ENTRY_POINTS
+# Optional: SRC_GLOBS, TEST_EXCLUDES, EXTRA_GHOST_PATTERNS
+
+# Language of the project. One of: rust, python, node, go, java
+LANG="rust"
+
+# Space-separated paths to the PRODUCTION entry-point file(s).
+# NOT tests, NOT scripts, NOT examples. The code that runs when the user
+# executes the published binary / service.
+#
+# Examples:
+#   Rust:    ENTRY_POINTS="crates/my-cli/src/main.rs"
+#   Rust ws: ENTRY_POINTS="crates/my-cli/src/main.rs crates/my-daemon/src/main.rs"
+#   Python:  ENTRY_POINTS="src/myapp/__main__.py"
+#   Node:    ENTRY_POINTS="src/server.ts"
+#   Go:      ENTRY_POINTS="cmd/myapp/main.go"
+#   Java:    ENTRY_POINTS="src/main/java/com/example/App.java"
+ENTRY_POINTS="src/main.rs"
+
+# Optional — override file glob for symbol extraction.
+# Default varies by LANG (see lang/*.sh).
+# SRC_GLOBS="crates/*/src/**/*.rs"
+
+# Optional — extra patterns to exclude beyond the language defaults.
+# TEST_EXCLUDES="**/mock_*.rs **/*_bench.rs"
+
+# Optional — extra placeholder patterns to scan for in addition to the standard
+# TODO/FIXME/placeholder/DEV SKIPPED/[0u8;N] set.
+# EXTRA_GHOST_PATTERNS="unimplemented|stubbed"

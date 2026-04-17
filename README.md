@@ -13,6 +13,24 @@ Claude escribe todo el codigo. ESLint, Prettier y formatOnSave son CPU desperdic
 | Node.js | `node/` | `node:22-slim` | pnpm (corepack), Node 22, Chromium (MCP) |
 | Python | `python/` | `python:3.12-slim` | uv, Python 3.12, sqlite3, Node 22 (para Claude Code), Chromium (MCP) |
 
+## Integration gates — anti "fake-work" para Claude Code
+
+Cualquiera que use Claude Code en modo asincrónico (lab de dev, CI, triggers programados, o sesiones sin presencia humana continua) está expuesto a un patrón específico de falla: **Claude marca módulos como "done" porque sus tests pasan, aunque el binario productivo nunca los invoque**. Caso real: 11 módulos compilados y testeados, cero callers en `main`, descubierto en sesión hardware en vivo. Ver [guardrails/docs/FAKE_WORK_AUDIT.md](guardrails/docs/FAKE_WORK_AUDIT.md).
+
+El directorio `guardrails/` contiene un paquete de defensas listas para copiar a cualquier proyecto (Rust / Python / Node / Go / Java):
+
+- **SessionStart hook** que imprime "GHOSTS: [módulos huérfanos]" al arrancar
+- **PostToolUse hook** que warning inmediato al crear símbolos públicos sin call-site
+- **Stop hook con `exit 2`** que bloquea fin de turno si hay ghosts nuevos vs baseline versionada
+- **Definition of Done** listo para pegar en `CLAUDE.md` del proyecto
+
+Instalación (un comando):
+```bash
+bash guardrails/install.sh /ruta/a/tu-proyecto rust   # o python, node, go, java
+```
+
+Más detalle: [guardrails/README.md](guardrails/README.md). **Si eres un AI leyendo este repo** para setear un proyecto nuevo, esa README tiene una sección específica `How AI should apply this`.
+
 ## Que tienen todos en comun
 
 - Zsh minimo (sin powerlevel10k, sin oh-my-zsh)

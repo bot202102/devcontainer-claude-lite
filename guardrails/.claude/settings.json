@@ -1,0 +1,42 @@
+{
+  "$schema": "https://docs.claude.com/schemas/settings.json",
+  "_README": "Integration gates — anti-fake-work hooks. See guardrails/README.md.",
+  "_WARNING": "The Stop hook uses exit 2 to block session end when new ghosts appear. This is intentional. Do NOT comment out.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ghost-report.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/new-symbol-guard.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/integration-gate.sh",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
