@@ -19,7 +19,9 @@ CONF="$HOOKS_DIR/project.conf"
 
 [ ! -f "$CONF" ] && exit 0
 # shellcheck source=/dev/null
+set -a
 source "$CONF"
+set +a
 [ -z "${LANG:-}" ] && exit 0
 [ -z "${ENTRY_POINTS:-}" ] && exit 0
 

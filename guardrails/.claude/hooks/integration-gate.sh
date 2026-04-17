@@ -25,7 +25,9 @@ if [ ! -f "$CONF" ]; then
 fi
 
 # shellcheck source=/dev/null
+set -a
 source "$CONF"
+set +a
 
 if [ -z "${LANG:-}" ] || [ -z "${ENTRY_POINTS:-}" ]; then
     echo "⚠️  integration-gate.sh: project.conf missing LANG or ENTRY_POINTS." >&2
