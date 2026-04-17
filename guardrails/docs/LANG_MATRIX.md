@@ -124,6 +124,97 @@ const srcFiles = project.getSourceFiles();
 ### Archivos
 - `.claude/hooks/lang/node.sh` — checker
 
+## Astro
+
+### Por qué un checker separado de `node`
+
+Astro es **file-based routing**: `src/pages/**/*.astro` y `src/pages/api/**/*.ts` son
+entry-points implícitos — no hay un único `src/index.ts` que el campo `"main"` de
+`package.json` apunte. El checker `node.sh` pide un `ENTRY_POINTS` concreto y
+grepea solo dentro de ese archivo + su dir. En Astro fallaría inmediatamente
+porque un símbolo consumido desde `src/pages/api/users/[id].ts` no aparece en
+ningún `ENTRY_POINTS` razonable.
+
+`astro.sh` resuelve esto escaneando el árbol entero de `src/` + `middleware.ts` +
+`astro.config.*` como corpus de referencia, excluyendo los archivos de `src/pages/`
+de la lista de *definidores* (porque pages son consumidores, no módulos
+compartidos).
+
+### Mecanismo
+
+```bash
+# 1. Archivos que pueden DEFINIR símbolos compartidos (excluye pages/ y tests)
+find src -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o ... \) \
+    | grep -v '^src/pages/' | grep -v '\.test\.\|\.spec\.\|/__tests__/'
+
+# 2. Extraer top-level exports por grep heurístico
+#    export (const|let|var|function|async function|class|enum|interface|type)
+
+# 3. Corpus de referencia: todos los archivos de src/ (incluye pages + .astro)
+#    más middleware.ts y astro.config.{mjs,ts,js} en la raíz del proyecto.
+
+# 4. Tokenizar el corpus en pares "token:file" (identificadores únicos por archivo)
+
+# 5. Un símbolo es ghost si su nombre NO aparece en ningún archivo del corpus
+#    distinto al suyo propio (exclusión de self-hits).
+```
+
+El paso 4 (tokenización) permite evitar un `grep -w` por-símbolo sobre cientos de
+archivos. Con ~1,500 archivos TS en un proyecto Astro mediano, el checker corre
+en ~2-3s — bien dentro del timeout de 60s del Stop hook.
+
+### Entry-points auto-detectados
+
+`astro.sh` NO requiere `ENTRY_POINTS` configurado — ignora la variable. Los roots
+se auto-detectan:
+
+- `src/pages/**/*.astro` — páginas server-rendered
+- `src/pages/api/**/*.{ts,tsx,js,mjs}` — API routes
+- `src/pages/**/*.{ts,tsx}` — endpoints dinámicos
+- `src/middleware.ts` / `src/middleware.js` (si existen)
+- `astro.config.{mjs,ts,js}` en la raíz
+
+Si tu proyecto usa un `pages/` dir no estándar, override con `SRC_GLOBS` (apunta
+al root del scan, no del entry-point específico).
+
+### Over-approximation intencional
+
+El checker NO hace true module-reachability (eso requeriría un parser de imports
+que resuelva `@/` alias + barrel re-exports + `export * from`). En su lugar
+acepta como "wired" cualquier símbolo cuyo nombre aparezca en CUALQUIER archivo
+del corpus distinto al suyo — incluyendo archivos dentro de otros ghosts. Esto
+produce falsos positivos (símbolos usados solo entre ghosts marcados como
+wired) y falsos negativos aceptables (barrels).
+
+La baseline mechanism absorbe ambos: el primer run captura ~N símbolos
+heredados como aceptados, los commit reviewers deciden si wirear/borrar con
+el tiempo, y los NEW ghosts (no-presentes-en-baseline) son los que bloquean
+fin de turno.
+
+### Limitaciones específicas
+
+- **Barrel re-exports (`export * from './X'`)**: el símbolo `foo` definido en `X`
+  NO aparece textualmente en el barrel. Si ningún consumer importa `foo` por
+  nombre (solo el barrel), el checker lo flagea como ghost. Fix: tu código
+  probablemente SÍ lo referencia en algún consumer (grep manual). Si realmente
+  es accedido solo vía barrel indirecto, agrégalo a baseline.
+- **Uso en componentes `.astro`**: los archivos `.astro` SÍ están incluidos en el
+  corpus de tokenización, pero solo el frontmatter (script block) se tokeniza
+  correctamente — el template puede referir componentes React con sintaxis
+  JSX dentro de un bloque `{}` que tr/awk cortan en tokens también. En
+  práctica funciona.
+- **Rutas dinámicas (`[...slug].astro`)**: el checker las incluye — funcionan
+  como cualquier otro archivo del corpus.
+
+### Entry-point candidates
+
+- No aplicable — auto-detectados. El campo `ENTRY_POINTS` del `project.conf`
+  es informativo para los mensajes del gate; no lo usa el checker.
+
+### Archivos
+
+- `.claude/hooks/lang/astro.sh` — checker
+
 ## Go
 
 ### Mecanismo

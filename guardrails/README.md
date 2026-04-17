@@ -75,7 +75,7 @@ cat guardrails-docs.md >> CLAUDE.md  # o copia el bloque manualmente
 O ejecuta el one-liner:
 
 ```bash
-bash guardrails/install.sh /ruta/a/tu-proyecto rust   # o python, node, go, java
+bash guardrails/install.sh /ruta/a/tu-proyecto rust   # o python, node, astro, go, java
 ```
 
 Ver [install.sh](install.sh) para detalle.
@@ -101,6 +101,7 @@ guardrails/
             ├── rust.sh
             ├── python.sh
             ├── node.sh
+            ├── astro.sh          # file-based routing (multi entry-point)
             ├── go.sh
             └── java.sh
 ```
@@ -112,10 +113,16 @@ guardrails/
 | **Rust** | `rg 'pub (struct\|fn new)' src/` → grep en `$ENTRY_POINTS`. Opcional `cargo tree --edges=normal` | `ripgrep`, `cargo` |
 | **Python** | `python -m ast` extrae `def`/`class` públicas (sin `_`). Grep imports desde entry-point | `python3` |
 | **Node/TS** | `tsc --listFiles` + análisis de `export` (via `grep` o `ts-morph`). Verifica import-graph desde `main` de `package.json` | `tsc` (opcional) |
+| **Astro** | Variante de Node/TS para file-based routing: auto-descubre `src/pages/**` + `src/middleware.ts` + `astro.config.*` como entry-points múltiples. Excluye `pages/` de los definidores (pages son consumers). Sin `ENTRY_POINTS` requerido | `grep`, `awk`, `tr` |
 | **Go** | `go list -deps ./cmd/app` → paquetes alcanzables. Diff vs paquetes con símbolos exportados nuevos | `go` |
 | **Java** | `grep "import .*NewClass"` sobre `src/main/java/` + heurística de reachability | `ripgrep` |
 
 Ver [docs/LANG_MATRIX.md](docs/LANG_MATRIX.md) para detalle de cada uno.
+
+### Cuándo usar `astro` vs `node`
+
+- **`astro`**: el proyecto tiene `src/pages/` con routing file-based (Astro, SvelteKit-style, Next.js App Router con `app/`). No hay un único `"main"` en `package.json` que alcance todo el código productivo.
+- **`node`**: el proyecto tiene un entry-point único (CLI, Express server con `src/index.ts`, librería publicada en npm). El campo `"main"` del `package.json` es el punto de partida real.
 
 ## Qué NO hace este template
 
@@ -138,7 +145,8 @@ Ver [docs/LANG_MATRIX.md](docs/LANG_MATRIX.md) para detalle de cada uno.
 2. Detecta el lenguaje del proyecto target:
    - `Cargo.toml` → rust
    - `pyproject.toml` / `setup.py` / `requirements.txt` → python
-   - `package.json` → node
+   - `package.json` con `astro` en dependencies / `astro.config.{mjs,ts,js}` presente → astro
+   - `package.json` sin Astro → node
    - `go.mod` → go
    - `pom.xml` / `build.gradle` → java
 3. Identifica el entry-point productivo (NO tests, NO scripts internos):

@@ -47,8 +47,7 @@ bash "$LANG_CHECKER" | sort -u > "$CURRENT" || true
 # If no baseline exists, create it (first run) and pass.
 if [ ! -f "$BASELINE" ]; then
     cp "$CURRENT" "$BASELINE"
-    echo "ℹ️  integration-gate.sh: baseline created at $BASELINE ($(wc -l < "$BASELINE") ghosts inherited)." >&2
-    echo "   Commit it: git add $BASELINE && git commit -m 'chore: claude integration-gate baseline'" >&2
+    echo "integration-gate.sh: baseline created at $BASELINE ($(wc -l < "$BASELINE") inherited ghosts). Review + commit in a follow-up PR." >&2
     exit 0
 fi
 
@@ -56,29 +55,22 @@ fi
 NEW_GHOSTS=$(comm -23 "$CURRENT" <(sort -u "$BASELINE") || true)
 
 if [ -n "$NEW_GHOSTS" ]; then
-    echo "🚫 INTEGRATION GATE FAILED — new ghost symbols detected." >&2
+    echo "INTEGRATION GATE BLOCK: new public symbols have no call-site reachable from $ENTRY_POINTS." >&2
     echo "" >&2
-    echo "The following public symbols were added but have NO call-site" >&2
-    echo "reachable from the production entry-point(s): $ENTRY_POINTS" >&2
+    echo "$NEW_GHOSTS" | sed 's/^/  /' >&2
     echo "" >&2
-    echo "$NEW_GHOSTS" | sed 's/^/   /' >&2
-    echo "" >&2
-    echo "Fix options:" >&2
-    echo "  1. (Recommended) Wire the symbol into $ENTRY_POINTS — add the call-site." >&2
-    echo "  2. Delete the symbol if it's dead code." >&2
-    echo "  3. (Last resort) Add to baseline with a PR-reviewed justification:" >&2
-    echo "     echo '<symbol>' >> $BASELINE && git add $BASELINE" >&2
-    echo "" >&2
-    echo "See guardrails/docs/FAKE_WORK_AUDIT.md for why this gate exists." >&2
+    echo "Default action (proceed WITHOUT consulting the user): for each symbol above, add a call-site from $ENTRY_POINTS (preferred — the feature must actually run) or delete it if dead." >&2
+    echo "Appending to $BASELINE is a last-resort escape hatch reserved for intentional exceptions that a PR reviewer will validate; do not use it to close this turn quickly." >&2
+    echo "Context: guardrails/docs/FAKE_WORK_AUDIT.md." >&2
     exit 2
 fi
 
-# All good. Also report if baseline has ghosts cleared (informational).
+# All good. Informational: if ghosts cleared from baseline, suggest a refresh.
 CLEARED=$(comm -13 "$CURRENT" <(sort -u "$BASELINE") || true)
 if [ -n "$CLEARED" ]; then
-    echo "✅ integration-gate.sh: no new ghosts. Cleared from baseline:" >&2
-    echo "$CLEARED" | sed 's/^/   /' >&2
-    echo "   (consider running: sort -u $CURRENT > $BASELINE && git add $BASELINE)" >&2
+    echo "integration-gate.sh: no new ghosts. Symbols no longer in the scan that baseline still lists:" >&2
+    echo "$CLEARED" | sed 's/^/  /' >&2
+    echo "A baseline refresh (sort -u $CURRENT > $BASELINE) is appropriate when convenient; it is not blocking." >&2
 fi
 
 exit 0

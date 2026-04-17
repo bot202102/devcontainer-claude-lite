@@ -40,28 +40,21 @@ bash "$LANG_CHECKER" | sort -u > "$CURRENT" || true
 GHOST_COUNT=$(wc -l < "$CURRENT" | tr -d ' ')
 
 if [ "$GHOST_COUNT" -eq 0 ]; then
-    echo "✅ Integration gate: 0 ghost modules (all public symbols wired to $ENTRY_POINTS)."
+    echo "Integration gate: 0 ghost symbols — all public symbols have a call-site in $ENTRY_POINTS."
     exit 0
 fi
 
-echo "👻 GHOST MODULES DETECTED at session start ($GHOST_COUNT public symbols without call-site in production entry-point):"
+echo "Ghost inventory at session start: $GHOST_COUNT public symbols have no call-site in $ENTRY_POINTS."
+echo "These compile (and may have passing tests) but are never invoked from production code."
 echo ""
 
-# Show up to 20, then summary
-head -20 "$CURRENT" | sed 's/^/   /'
-
+head -20 "$CURRENT" | sed 's/^/  /'
 if [ "$GHOST_COUNT" -gt 20 ]; then
-    echo "   ... and $((GHOST_COUNT - 20)) more"
+    echo "  ... and $((GHOST_COUNT - 20)) more"
 fi
 
 echo ""
-echo "Entry-point: $ENTRY_POINTS"
-echo "These symbols compile and may have tests, but are NOT invoked from production code."
-echo ""
-echo "Action needed (choose one before closing session):"
-echo "  - Wire into $ENTRY_POINTS (preferred — the feature should actually run)"
-echo "  - Delete if dead code"
-echo "  - Add to baseline (.claude/ghost-baseline.txt) with PR-reviewable justification"
-echo ""
-echo "Stop hook (.claude/hooks/integration-gate.sh) will block session end if"
-echo "new ghosts appear vs baseline. See guardrails/docs/FAKE_WORK_AUDIT.md."
+echo "Default behaviour for any NEW symbol this session: wire it from $ENTRY_POINTS, or delete it."
+echo "The Stop gate (.claude/hooks/integration-gate.sh) blocks session end on any new ghost vs baseline."
+echo "Do NOT treat .claude/ghost-baseline.txt as a default escape hatch — it is reserved for intentional exceptions that a PR reviewer will validate."
+echo "No user confirmation is required to pick wire-vs-delete — decide and proceed."

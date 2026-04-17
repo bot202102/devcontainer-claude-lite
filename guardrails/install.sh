@@ -7,7 +7,11 @@
 # project.conf with the specified lang, initializes ghost-baseline.txt,
 # and appends the Definition of Done to <target>/CLAUDE.md.
 #
-# langs: rust | python | node | go | java
+# langs: rust | python | node | astro | go | java
+#
+# `astro` is a specialization of `node` for Astro projects: it treats every
+# file under src/pages/ plus src/middleware.ts and astro.config.{mjs,ts,js}
+# as an implicit entry-point (file-based routing has no single `main`).
 #
 # Idempotent-ish: re-running overwrites hook scripts (so updates propagate)
 # but preserves project.conf and ghost-baseline.txt if they exist.
@@ -20,7 +24,7 @@ LANG="${2:-}"
 
 if [ -z "$TARGET" ] || [ -z "$LANG" ]; then
     echo "Usage: $0 <target-project-dir> <lang>" >&2
-    echo "  langs: rust | python | node | go | java" >&2
+    echo "  langs: rust | python | node | astro | go | java" >&2
     exit 1
 fi
 
@@ -30,10 +34,10 @@ if [ ! -d "$TARGET" ]; then
 fi
 
 case "$LANG" in
-    rust|python|node|go|java) ;;
+    rust|python|node|astro|go|java) ;;
     *)
         echo "Unsupported language: $LANG" >&2
-        echo "Supported: rust | python | node | go | java" >&2
+        echo "Supported: rust | python | node | astro | go | java" >&2
         exit 1
         ;;
 esac
@@ -85,6 +89,14 @@ if [ ! -f ".claude/hooks/project.conf" ]; then
                 EP=$(node -e "try { console.log(require('./package.json').main || 'src/index.ts') } catch(e) { console.log('src/index.ts') }" 2>/dev/null)
             else
                 EP="src/index.ts"
+            fi
+            ;;
+        astro)
+            # Astro has no single entry-point. We record a representative
+            # root that the gate messages can refer to; the checker itself
+            # auto-discovers src/pages/** + middleware + astro.config.
+            if [ -d "src/pages" ]; then EP="src/pages/"
+            else EP="src/pages/"
             fi
             ;;
         go)
