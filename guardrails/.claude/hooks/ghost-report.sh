@@ -20,7 +20,9 @@ if [ ! -f "$CONF" ]; then
 fi
 
 # shellcheck source=/dev/null
+set -a
 source "$CONF"
+set +a
 
 if [ -z "${LANG:-}" ] || [ -z "${ENTRY_POINTS:-}" ]; then
     exit 0
