@@ -34,10 +34,10 @@ if [ ! -d "$TARGET" ]; then
 fi
 
 case "$LANG" in
-    rust|python|node|astro|go|java) ;;
+    rust|python|node|astro|nextjs|go|java) ;;
     *)
         echo "Unsupported language: $LANG" >&2
-        echo "Supported: rust | python | node | astro | go | java" >&2
+        echo "Supported: rust | python | node | astro | nextjs | go | java" >&2
         exit 1
         ;;
 esac
@@ -97,6 +97,18 @@ if [ ! -f ".claude/hooks/project.conf" ]; then
             # auto-discovers src/pages/** + middleware + astro.config.
             if [ -d "src/pages" ]; then EP="src/pages/"
             else EP="src/pages/"
+            fi
+            ;;
+        nextjs)
+            # Next.js App Router has no single entry-point. We record a
+            # representative root for messages; the checker auto-discovers
+            # src/app/** (and src/pages/** if present) + middleware +
+            # next.config.* + instrumentation.
+            if [ -d "src/app" ]; then EP="src/app/"
+            elif [ -d "app" ]; then EP="app/"
+            elif [ -d "src/pages" ]; then EP="src/pages/"
+            elif [ -d "pages" ]; then EP="pages/"
+            else EP="src/app/"
             fi
             ;;
         go)

@@ -9,16 +9,16 @@
 # Required: LANG + ENTRY_POINTS
 # Optional: SRC_GLOBS, TEST_EXCLUDES, EXTRA_GHOST_PATTERNS
 
-# Language of the project. One of: rust, python, node, astro, go, java
+# Language of the project. One of: rust, python, node, astro, nextjs, go, java
 LANG="rust"
 
 # Space-separated paths to the PRODUCTION entry-point file(s).
 # NOT tests, NOT scripts, NOT examples. The code that runs when the user
 # executes the published binary / service.
 #
-# For `astro` this field is informational only — the checker auto-discovers
-# src/pages/**, src/middleware.ts and astro.config.*. Use a descriptive path
-# like "src/pages/" so gate messages reference something meaningful.
+# For `astro` and `nextjs` this field is informational only — the checker
+# auto-discovers file-based routing roots. Use a descriptive path so gate
+# messages reference something meaningful.
 #
 # Examples:
 #   Rust:    ENTRY_POINTS="crates/my-cli/src/main.rs"
@@ -26,6 +26,7 @@ LANG="rust"
 #   Python:  ENTRY_POINTS="src/myapp/__main__.py"
 #   Node:    ENTRY_POINTS="src/server.ts"
 #   Astro:   ENTRY_POINTS="src/pages/"
+#   Next.js: ENTRY_POINTS="src/app/"
 #   Go:      ENTRY_POINTS="cmd/myapp/main.go"
 #   Java:    ENTRY_POINTS="src/main/java/com/example/App.java"
 ENTRY_POINTS="src/main.rs"

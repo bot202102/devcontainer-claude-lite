@@ -83,7 +83,7 @@ cat guardrails-docs.md >> CLAUDE.md  # o copia el bloque manualmente
 O ejecuta el one-liner:
 
 ```bash
-bash guardrails/install.sh /ruta/a/tu-proyecto rust   # o python, node, astro, go, java
+bash guardrails/install.sh /ruta/a/tu-proyecto rust   # o python, node, astro, nextjs, go, java
 ```
 
 Ver [install.sh](install.sh) para detalle.
@@ -111,7 +111,8 @@ guardrails/
             ├── rust.sh
             ├── python.sh
             ├── node.sh
-            ├── astro.sh          # file-based routing (multi entry-point)
+            ├── astro.sh          # Astro file-based routing
+            ├── nextjs.sh         # Next.js App Router (src/app/**)
             ├── go.sh
             └── java.sh
 ```
@@ -156,7 +157,8 @@ Ver [docs/LANG_MATRIX.md](docs/LANG_MATRIX.md) para detalle de cada uno.
    - `Cargo.toml` → rust
    - `pyproject.toml` / `setup.py` / `requirements.txt` → python
    - `package.json` con `astro` en dependencies / `astro.config.{mjs,ts,js}` presente → astro
-   - `package.json` sin Astro → node
+   - `package.json` con `next` en dependencies / `next.config.{js,mjs,ts,cjs}` presente → nextjs
+   - `package.json` sin Astro ni Next → node
    - `go.mod` → go
    - `pom.xml` / `build.gradle` → java
 3. Identifica el entry-point productivo (NO tests, NO scripts internos):
