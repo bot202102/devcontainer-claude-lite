@@ -155,6 +155,19 @@ else
     echo "  ✓ Appended Definition of Done to CLAUDE.md"
 fi
 
+# 6. Install the verify-done skill (declarative-with-evidence layer).
+#    Complements the mechanical hooks by letting the agent self-audit with
+#    real command output before claiming completion. See guardrails/skills/verify-done.md.
+if [ -f "$SCRIPT_DIR/skills/verify-done.md" ]; then
+    mkdir -p .claude/skills
+    if [ -f ".claude/skills/verify-done.md" ]; then
+        echo "  ⚠️  .claude/skills/verify-done.md already exists — NOT overwriting."
+    else
+        cp -f "$SCRIPT_DIR/skills/verify-done.md" .claude/skills/verify-done.md
+        echo "  ✓ Installed verify-done skill at .claude/skills/verify-done.md"
+    fi
+fi
+
 echo ""
 echo "✅ Installation complete."
 echo ""
@@ -167,3 +180,4 @@ echo "Docs:"
 echo "  - Problem + approach: guardrails/README.md"
 echo "  - Real case study:    guardrails/docs/FAKE_WORK_AUDIT.md"
 echo "  - Per-lang mechanism: guardrails/docs/LANG_MATRIX.md"
+echo "  - Self-check skill:   guardrails/skills/verify-done.md (installed at .claude/skills/)"
