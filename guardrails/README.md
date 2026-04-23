@@ -22,7 +22,7 @@
 
 Agnóstico al lenguaje. Cambia el mecanismo de verificación por lenguaje (Rust usa `cargo tree`, Python usa `ast.parse`, Node usa `tsc --listFiles`, etc.) pero el invariante es el mismo.
 
-## Arquitectura defensiva (3 capas)
+## Arquitectura defensiva (4 capas)
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -40,16 +40,24 @@ Agnóstico al lenguaje. Cambia el mecanismo de verificación por lenguaje (Rust 
 └────────────────────────────────────────────────────────┘
                          +
 ┌────────────────────────────────────────────────────────┐
-│ Capa 0 (soft) — CLAUDE.md con Definition of Done       │
-│ Instrucción declarativa. Inútil sola; indispensable   │
+│ Capa 0a (soft) — CLAUDE.md con Definition of Done      │
+│ Norma declarativa. Inútil sola; indispensable          │
 │ combinada con los hooks mecánicos arriba               │
+├────────────────────────────────────────────────────────┤
+│ Capa 0b (declarativa con evidencia) — skill verify-done│
+│ Claude la invoca ANTES de afirmar "done". Corre los 6  │
+│ checks del DoD y devuelve evidencia real (cargo tree,  │
+│ grep, curl, log trace). No bloquea — cierra la brecha  │
+│ entre "norma" (Capa 0a) y "hook mecánico" (Capa 3).   │
+│ Ver skills/verify-done.md.                             │
 └────────────────────────────────────────────────────────┘
 ```
 
 Cobertura aproximada:
-- Solo CLAUDE.md: **~40%** (Claude puede driftar)
-- + Capa 3 (Stop gate): **~85%** (mayoría de casos capturados)
-- + Capas 1+2: **~95%** (defensa en profundidad)
+- Solo CLAUDE.md (Capa 0a): **~40%** (Claude puede driftar)
+- + skill verify-done (Capa 0b): **~70%** (self-check con evidencia antes del Stop)
+- + Capa 3 (Stop gate): **~90%** (cinturón mecánico captura el resto)
+- + Capas 1+2: **~95%** (defensa en profundidad completa)
 
 ## Instalación — 4 pasos en proyecto nuevo
 
@@ -90,6 +98,8 @@ guardrails/
 │   ├── FAKE_WORK_AUDIT.md       # Caso real que motivó este template
 │   ├── DEFINITION_OF_DONE.md    # Bloque para pegar en CLAUDE.md
 │   └── LANG_MATRIX.md           # Cómo funciona el checker por lenguaje
+├── skills/
+│   └── verify-done.md           # Capa 0b — skill de self-check con evidencia
 └── .claude/
     ├── settings.json            # Hooks registration (merge con el tuyo)
     └── hooks/
@@ -165,6 +175,7 @@ Los archivos finales viven en el proyecto target:
 - `<project>/.claude/hooks/*.sh` — scripts ejecutables
 - `<project>/.claude/hooks/project.conf` — config LANG + ENTRY_POINTS
 - `<project>/.claude/ghost-baseline.txt` — commited (importante para PR review)
+- `<project>/.claude/skills/verify-done.md` — skill de self-check con evidencia (Capa 0b)
 - `<project>/CLAUDE.md` — sección Definition of Done pegada al final
 
 ### WHAT NOT TO DO
@@ -177,9 +188,11 @@ Los archivos finales viven en el proyecto target:
 - [docs/FAKE_WORK_AUDIT.md](docs/FAKE_WORK_AUDIT.md) — Caso real que motivó este template (evidencia, métricas, anti-patterns)
 - [docs/DEFINITION_OF_DONE.md](docs/DEFINITION_OF_DONE.md) — Bloque listo para pegar en `CLAUDE.md`
 - [docs/LANG_MATRIX.md](docs/LANG_MATRIX.md) — Detalle de cada checker por lenguaje
+- [skills/verify-done.md](skills/verify-done.md) — Capa 0b: self-check declarativo con evidencia real
 - [install.sh](install.sh) — Instalador universal
 - Claude Code hooks reference: https://docs.claude.com/en/docs/claude-code/hooks
 - Claude Code settings reference: https://docs.claude.com/en/docs/claude-code/settings
+- Claude Code skills reference: https://docs.claude.com/en/docs/claude-code/skills
 
 ## Licencia
 
