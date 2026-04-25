@@ -47,6 +47,7 @@ Adapt the command to the project's `LANG` (from `project.conf`). Symbol `$SYM` =
 | astro | `grep -r "from.*<new-module>" src/pages/ src/middleware.ts astro.config.*` |
 | go | `go list -deps ./cmd/<app> \| grep <new-package>` |
 | java | `grep -r "import.*<NewClass>" src/main/java/` |
+| kotlin-android | One of: `grep -rw "<NewClass>" $ENTRY_POINTS` (entry-points reachability) — OR — `grep -rE "(single\|factory\|viewModel)\s*\{[^}]*<NewClass>" app/src/main/java/.../core/di/` (Koin module registration) — OR — `grep "<NewClass>" app/src/main/AndroidManifest.xml` (manifest-declared) — OR — `grep -rwl "<NewClass>" app/src/main/java/ \| grep -v "<defining-file>"` (any other production caller) |
 
 PASS if ≥1 match. FAIL if 0 matches — the "module is wired" claim is false.
 
@@ -62,6 +63,7 @@ PASS if ≥1 match. FAIL if 0 matches — the "module is wired" claim is false.
 | astro / fastify / express | `curl -s http://localhost:<port>/<route>` — expect non-placeholder JSON |
 | go | `<binary> --help \| grep -i <feature>` |
 | java | `java -jar target/<jar> --help \| grep -i <feature>` |
+| kotlin-android | App has no `--help` flag. Verify via: (a) `adb shell am start -n <applicationId>/.MainActivity` then exercise the feature in the UI and `adb logcat -s <TAG>:V \| grep <unique-string>`; OR (b) for backend-touching features, `curl <prod-api>/...` shows non-placeholder JSON. If neither is feasible (no device, no JDK in sandbox), say "Check 2 CANNOT RUN: no device/emulator available" — do not fake. |
 
 PASS if the feature is referenced AND the response is not `{}`, `{"note": "..."}`, `{"status": "pending"}`, `"Coming soon"`, `"available when connected"`. FAIL if placeholder.
 

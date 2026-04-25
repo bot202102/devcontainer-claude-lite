@@ -9,7 +9,14 @@
 # Required: LANG + ENTRY_POINTS
 # Optional: SRC_GLOBS, TEST_EXCLUDES, EXTRA_GHOST_PATTERNS
 
-# Language of the project. One of: rust, python, node, astro, nextjs, go, java
+# Language of the project. One of:
+#   rust, python, node, astro, nextjs, go, java, kotlin-android
+#
+# kotlin-android: Android-specific Kotlin checker. Auto-discovers Koin
+# module DSL files as reachability sources and treats AndroidManifest.xml
+# as an additional reach source for declared Activity/Service/Receiver/
+# Provider symbols. Use this for Android projects; for server-side or KMP
+# Kotlin, prefer the `java` checker (which scans .kt + .java).
 LANG="rust"
 
 # Space-separated paths to the PRODUCTION entry-point file(s).
@@ -29,6 +36,9 @@ LANG="rust"
 #   Next.js: ENTRY_POINTS="src/app/"
 #   Go:      ENTRY_POINTS="cmd/myapp/main.go"
 #   Java:    ENTRY_POINTS="src/main/java/com/example/App.java"
+#   Kotlin-Android:
+#       ENTRY_POINTS="app/src/main/java/com/example/app/MainActivity.kt app/src/main/java/com/example/app/MyApplication.kt app/src/main/java/com/example/app/AppNavGraph.kt"
+#       Optional: MANIFEST_PATH="app/src/main/AndroidManifest.xml" (default)
 ENTRY_POINTS="src/main.rs"
 
 # Optional — override file glob for symbol extraction.

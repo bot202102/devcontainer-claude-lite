@@ -114,7 +114,8 @@ guardrails/
             ├── astro.sh          # Astro file-based routing
             ├── nextjs.sh         # Next.js App Router (src/app/**)
             ├── go.sh
-            └── java.sh
+            ├── java.sh
+            └── kotlin-android.sh # Android Kotlin (Koin DI + AndroidManifest)
 ```
 
 ## Lenguajes soportados
@@ -127,6 +128,7 @@ guardrails/
 | **Astro** | Variante de Node/TS para file-based routing: auto-descubre `src/pages/**` + `src/middleware.ts` + `astro.config.*` como entry-points múltiples. Excluye `pages/` de los definidores (pages son consumers). Sin `ENTRY_POINTS` requerido | `grep`, `awk`, `tr` |
 | **Go** | `go list -deps ./cmd/app` → paquetes alcanzables. Diff vs paquetes con símbolos exportados nuevos | `go` |
 | **Java** | `grep "import .*NewClass"` sobre `src/main/java/` + heurística de reachability | `ripgrep` |
+| **Kotlin-Android** | Especialización Android de Kotlin. Scan `app/src/main/java/**/*.kt` para top-level `class`/`object`/`interface`/`enum class`/`sealed class`/`data class` + `fun` (rechaza `private`/`internal`/`protected`). Reachability sources: ENTRY_POINTS multi-archivo (MainActivity + Application class + NavGraph composable) + `AndroidManifest.xml` + auto-discovery de archivos con Koin DSL `module {`. Fallback: grep recursivo en `SCAN_ROOT`. **Requiere Android conventions** — para Kotlin server-side / KMP usa el checker `java` (que también scanea `.kt`). | `grep`, `awk`, `find` |
 
 Ver [docs/LANG_MATRIX.md](docs/LANG_MATRIX.md) para detalle de cada uno.
 
@@ -134,6 +136,13 @@ Ver [docs/LANG_MATRIX.md](docs/LANG_MATRIX.md) para detalle de cada uno.
 
 - **`astro`**: el proyecto tiene `src/pages/` con routing file-based (Astro, SvelteKit-style, Next.js App Router con `app/`). No hay un único `"main"` en `package.json` que alcance todo el código productivo.
 - **`node`**: el proyecto tiene un entry-point único (CLI, Express server con `src/index.ts`, librería publicada en npm). El campo `"main"` del `package.json` es el punto de partida real.
+
+### Cuándo usar `kotlin-android` vs `java`
+
+- **`kotlin-android`**: app Android nativa con `AndroidManifest.xml`, módulos DI tipo Koin (`module {...}` DSL), entry-points múltiples (MainActivity + Application class + NavGraph composable). Detecta @Composable orphans + ViewModel/UseCase/Repository sin registración Koin + clases declaradas pero no usadas en producción.
+  - Validado contra Drivox CRM (~604 archivos `.kt`, 48 ghosts heredados, 7.5s baseline run).
+- **`java`**: backend Java o Kotlin server-side (Spring/Ktor/Micronaut) con un único `public static void main`. El checker `java` scanea ambos `.java` y `.kt` con la misma heurística de visibilidad — pero la noción de "Public class sin caller" es la única reachability check (no Koin, no manifest).
+- **Ninguno todavía cubre**: Kotlin Multiplatform (KMP) con múltiples targets, ni Compose Multiplatform desktop. Para esos casos crea un checker derivado.
 
 ## Qué NO hace este template
 
@@ -160,13 +169,15 @@ Ver [docs/LANG_MATRIX.md](docs/LANG_MATRIX.md) para detalle de cada uno.
    - `package.json` con `next` en dependencies / `next.config.{js,mjs,ts,cjs}` presente → nextjs
    - `package.json` sin Astro ni Next → node
    - `go.mod` → go
-   - `pom.xml` / `build.gradle` → java
+   - `app/build.gradle.kts` con `com.android.application` plugin / `app/src/main/AndroidManifest.xml` presente → kotlin-android
+   - `pom.xml` / `build.gradle` (server-side, no Android) → java
 3. Identifica el entry-point productivo (NO tests, NO scripts internos):
    - Rust: `crates/*/src/main.rs`, `src/main.rs`, `src/bin/*.rs`
    - Python: script con `if __name__ == "__main__"`, `__main__.py`, campo `scripts` en `pyproject.toml`
    - Node: campo `"main"` / `"bin"` en `package.json`, archivo de `"start"` script
    - Go: `cmd/<app>/main.go`
    - Java: clase con método `public static void main`
+   - Kotlin-Android: `app/src/main/java/.../MainActivity.kt` + `*Application.kt` (Application class) + `*App.kt` (top-level Compose graph composable, si existe)
 4. Ejecuta `bash guardrails/install.sh <target-project> <lang>`
 5. Pega el contenido de [docs/DEFINITION_OF_DONE.md](docs/DEFINITION_OF_DONE.md) al final del `CLAUDE.md` del proyecto
 6. Reporta al humano: "Integration gates instalados. Baseline capturado: N símbolos heredados. Ghost-check activo."
