@@ -141,6 +141,22 @@ const srcFiles = project.getSourceFiles();
 - Dynamic imports (`import()`) no siempre son rastreables estáticamente
 - Re-exports tipo barrel (`export * from './module'`) pueden crear falsos positivos
 
+### Self-match exclusion (regression-fix)
+
+El scan recursivo del directorio del entry-point **debe excluir el archivo
+que define el símbolo**. Cuando `find` itera sobre `ep_dir`, encuentra el
+propio archivo del export — y la línea `export function foo()` contiene
+trivialmente el token `foo`, por lo que `grep -qw "$symbol"` siempre
+matchea. Sin la exclusión `! -path "$defining_file"`, cada símbolo
+self-matchea y el gate nunca bloquea (caso real reproducido en un workspace
+pnpm con Express + TypeScript donde `ENTRY_POINTS=backend/src/index.ts`
+y todos los archivos viven bajo `backend/src/`).
+
+El checker actual extrae `defining_file` parseando la línea
+`file:NR:symbol` (sed strip de los dos últimos campos) y lo pasa como
+`! -path` a `find`. Comparar con `nextjs.sh` que ya tenía esta exclusión
+vía `is_self` en su corpus tokenizado.
+
 ### Entry-point candidates
 - Campo `"main"` en `package.json`
 - Campo `"bin"` en `package.json` (para CLIs)
