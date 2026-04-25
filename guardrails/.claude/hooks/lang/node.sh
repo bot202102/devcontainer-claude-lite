@@ -67,6 +67,8 @@ done < "$TMP_FILES" > "$TMP_SYMS"
 while IFS= read -r line; do
     [ -z "$line" ] && continue
     symbol=$(echo "$line" | awk -F: '{print $NF}')
+    # Defining file = everything before the trailing :line:symbol fields.
+    defining_file=$(echo "$line" | sed -E 's/:[0-9]+:[^:]+$//')
 
     case "$symbol" in
         default|main|Props|State|Config|Error|Type|Interface|Schema|Router|async|function)
@@ -76,11 +78,19 @@ while IFS= read -r line; do
     found=0
     for ep in $ENTRY_POINTS; do
         [ ! -f "$ep" ] && continue
-        if grep -qw "$symbol" "$ep" 2>/dev/null; then
+        # Direct entry-point reference. Skip self-match: if the entry-point
+        # IS the file that defines the symbol, the export line itself trivially
+        # contains the name.
+        if [ "$ep" != "$defining_file" ] && grep -qw "$symbol" "$ep" 2>/dev/null; then
             found=1; break
         fi
         ep_dir=$(dirname "$ep")
-        if find "$ep_dir" -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \) 2>/dev/null | while IFS= read -r f; do
+        # Recursive scan of the entry-point's directory MUST exclude the
+        # symbol's own defining file. Without this exclusion, every export
+        # self-matches in its own definition (`export function foo` contains
+        # the token `foo`), so `found=1` always — and the gate becomes a
+        # no-op for `node` mode.
+        if find "$ep_dir" -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \) ! -path "$defining_file" 2>/dev/null | while IFS= read -r f; do
             if grep -qw "$symbol" "$f" 2>/dev/null; then echo 1; break; fi
         done | grep -q '1'; then
             found=1; break
