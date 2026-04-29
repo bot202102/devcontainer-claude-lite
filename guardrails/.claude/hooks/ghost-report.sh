@@ -50,6 +50,20 @@ echo "Ghost inventory at session start: $GHOST_COUNT public symbols have no call
 echo "These compile (and may have passing tests) but are never invoked from production code."
 echo ""
 
+# Top 5 directories by ghost count — helps Claude triage which subsystems
+# carry the most fake-work debt. Uses the first 4 path segments as the
+# bucket so monorepos (apps/web/src/...) get useful granularity.
+if [ "$GHOST_COUNT" -gt 10 ]; then
+    echo "  Top directories by ghost count:"
+    awk -F: '{
+        n = split($1, parts, "/")
+        bucket = parts[1]
+        for (i = 2; i <= n - 1 && i <= 4; i++) bucket = bucket "/" parts[i]
+        print bucket
+    }' "$CURRENT" | sort | uniq -c | sort -rn | head -5 | sed 's/^/    /'
+    echo ""
+fi
+
 head -20 "$CURRENT" | sed 's/^/  /'
 if [ "$GHOST_COUNT" -gt 20 ]; then
     echo "  ... and $((GHOST_COUNT - 20)) more"

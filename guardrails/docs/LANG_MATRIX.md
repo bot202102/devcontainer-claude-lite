@@ -36,8 +36,12 @@ INTEGRATION GATE BLOCK: new public symbols have no call-site reachable from src/
 
 **Input**: variables de entorno definidas en `project.conf`:
 - `ENTRY_POINTS` — paths relativos (space-separated) al entry-point productivo
-- `SRC_GLOBS` — patrón de archivos a escanear (default: auto por lenguaje)
-- `TEST_EXCLUDES` — patrones a excluir del scan (default: auto por lenguaje)
+- `SRC_GLOBS` — directorio raíz del scan (default: auto por lenguaje). El
+  semantics depende del checker: `node.sh` lo usa como SCAN_ROOT (un único
+  directorio); otros checkers pueden tratarlo como glob.
+- `TEST_EXCLUDES` — patrones a excluir del scan (default: auto por lenguaje).
+  **Estos son substrings LITERALES** pasados a `grep -v`, NO globs de shell.
+  Usar `.stories.` en vez de `*.stories.*`. Usar `/e2e/` en vez de `**/e2e/**`.
 
 **Output**: `stdout` — una línea por ghost, formato:
 ```
@@ -162,6 +166,44 @@ vía `is_self` en su corpus tokenizado.
 - Campo `"bin"` en `package.json` (para CLIs)
 - Campo `"start"` en `scripts`
 - Archivo principal de Next.js / Express / Fastify
+- Para Vite SPAs: `<app>/src/main.tsx` (referenciado desde `index.html`)
+
+### Recipe: Vite SPA en monorepo
+
+Caso común no cubierto por los defaults de `install.sh`: monorepo pnpm con
+una app Vite (`apps/web`, `apps/dashboard`, etc.) donde no hay un único
+`"main"` en raíz y el SPA monta vía `<script type="module" src="/src/main.tsx">`
+desde `index.html`.
+
+`node.sh` funciona perfectamente para este caso, pero requiere `project.conf`
+custom porque la heurística de `install.sh` no detecta el path anidado. Config
+de referencia (probada en `bot202102/leyia`, ~120 archivos TS/TSX, 93 ghosts
+heredados al instalar):
+
+```bash
+LANG="node"
+
+# Entry-point del SPA. dirname(ENTRY_POINTS) = apps/web/src/ es la raíz
+# productiva: el checker greppea recursivamente desde ahí, lo que cubre
+# todos los componentes/hooks/stores que un SPA importa transitivamente
+# desde main.tsx → App.tsx → DockLayout → Panel → ...
+ENTRY_POINTS="apps/web/src/main.tsx"
+
+# Constrain el scan al frontend (sin esto, el checker se mete en scripts/,
+# doc/, configs de raíz y ensucia el baseline).
+SRC_GLOBS="apps/web/src"
+
+# Substrings literales (ver §Contrato). Storybook stories y test-utils
+# disparan ruido masivo si no se excluyen.
+TEST_EXCLUDES=".stories. /storybook-static/ /e2e/ /src/test/ /__tests__/ playwright.config"
+```
+
+Limitación conocida: tipos exportados pero usados solo dentro de su archivo
+de definición (`export interface Foo` consumido como return type por una
+función exportada en el mismo file) aparecen como ghosts porque el checker
+excluye el defining file del consumer scan. Aceptarlos en el baseline es
+correcto — el invariante "todo export tiene call-site externo" no aplica a
+tipos puramente internos.
 
 ### Archivos
 - `.claude/hooks/lang/node.sh` — checker

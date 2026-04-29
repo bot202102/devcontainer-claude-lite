@@ -33,10 +33,18 @@ ENTRY_POINTS="src/main.rs"
 
 # Optional — override file glob for symbol extraction.
 # Default varies by LANG (see lang/*.sh).
+# Each lang checker interprets this differently; for `node` it is a directory
+# (single root) — e.g. `apps/web/src` for a monorepo.
 # SRC_GLOBS="crates/*/src/**/*.rs"
 
 # Optional — extra patterns to exclude beyond the language defaults.
-# TEST_EXCLUDES="**/mock_*.rs **/*_bench.rs"
+#
+# IMPORTANT: these are LITERAL substrings passed to `grep -v` by the checker,
+# NOT shell globs. `*.stories.*` does NOT match `Button.stories.tsx`. Use the
+# substring instead:
+#   TEST_EXCLUDES=".stories. /e2e/ /storybook-static/ /__tests__/"
+#
+# TEST_EXCLUDES="**/mock_*.rs **/*_bench.rs"   # Rust example (lang-specific)
 
 # Optional — extra placeholder patterns to scan for in addition to the standard
 # TODO/FIXME/placeholder/DEV SKIPPED/[0u8;N] set.
