@@ -138,3 +138,18 @@ Usar al final de cada sesión antes de aceptar "done". Si Claude no puede respon
 ## Licencia de este documento
 
 El caso real está anonimizado en algunos puntos pero todas las métricas son reales. Uso libre para educar equipos que van a usar Claude Code. Atribución apreciada.
+
+---
+
+## Companion incident: LeyIA, 2026-04-29
+
+A second independent incident documented in [`INCIDENT_LEYIA_2026-04-29.md`](INCIDENT_LEYIA_2026-04-29.md). Different fault profile: 0% ghost code, 100% cross-layer drift. ~53 production bugs filed in 8 hours, all silently passing tests + linters + deploys, all caught by ad-hoc pattern-search agents.
+
+The LeyIA incident motivates 4 new defense classes proposed in upstream issue #24 and shipped as skills `verify-contract`, `verify-storage`, `verify-identity`, `verify-honest-failure`:
+
+1. **Contract drift** — consumer hand-written types diverge from producer schema (37 instances)
+2. **Storage write/read continuity** — orphan or split-brain storage layers (6 instances)
+3. **Identity-as-display confusion** — fields used as keys but only per-scope unique (6+ instances, including silent data loss in Qdrant via UUID5 collision)
+4. **Soft fallback** — empty/None returns followed by no signal — extends the existing silencer-pattern (issue #12 closed) to the opportunistic shape
+
+Read both documents together: GainShield is "code that compiles but isn't called"; LeyIA is "code that's called but doesn't actually work end-to-end across layers". Both are fake-work; they have different signatures and need different defenses.
