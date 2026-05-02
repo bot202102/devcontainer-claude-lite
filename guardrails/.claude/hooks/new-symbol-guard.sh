@@ -36,16 +36,17 @@ FILE_PATH=$(echo "$INPUT" | grep -oE '"file_path"\s*:\s*"[^"]*"' | head -1 | sed
 
 # Only check source files of the configured language
 case "$LANG" in
-    rust)    case "$FILE_PATH" in *.rs) ;; *) exit 0 ;; esac ;;
-    python)  case "$FILE_PATH" in *.py) ;; *) exit 0 ;; esac ;;
-    node)    case "$FILE_PATH" in *.ts|*.tsx|*.js|*.jsx) ;; *) exit 0 ;; esac ;;
-    go)      case "$FILE_PATH" in *.go) ;; *) exit 0 ;; esac ;;
-    java)    case "$FILE_PATH" in *.java) ;; *) exit 0 ;; esac ;;
+    rust)            case "$FILE_PATH" in *.rs) ;; *) exit 0 ;; esac ;;
+    python)          case "$FILE_PATH" in *.py) ;; *) exit 0 ;; esac ;;
+    node)            case "$FILE_PATH" in *.ts|*.tsx|*.js|*.jsx) ;; *) exit 0 ;; esac ;;
+    go)              case "$FILE_PATH" in *.go) ;; *) exit 0 ;; esac ;;
+    java)            case "$FILE_PATH" in *.java) ;; *) exit 0 ;; esac ;;
+    kotlin-android)  case "$FILE_PATH" in *.kt) ;; *) exit 0 ;; esac ;;
 esac
 
 # Skip test files
 case "$FILE_PATH" in
-    */tests/*|*_test.*|*.test.*|*_spec.*|*.spec.*|*__test__*)
+    */tests/*|*_test.*|*.test.*|*_spec.*|*.spec.*|*__test__*|*/src/test/*|*/src/androidTest/*|*TestKoin.kt|*Test.kt|*Tests.kt|*Spec.kt)
         exit 0 ;;
 esac
 
@@ -66,6 +67,18 @@ case "$LANG" in
     java)
         SYMBOLS=$(grep -oE 'public (class|interface|enum) [A-Z][A-Za-z0-9_]*' "$FILE_PATH" 2>/dev/null | awk '{print $3}' | sort -u || true)
         ;;
+    kotlin-android)
+        # Kotlin: classes are public by default — reject explicit private/internal/protected.
+        # Match column-0 declarations only (skip inner / member decls).
+        # Class-like:  (data|sealed|abstract|open|inline|value|annotation|enum)? (class|object|interface) Name
+        # Top-level fun (column 0).
+        CLASSES=$(grep -E '^(public[[:space:]]+)?(abstract[[:space:]]+|open[[:space:]]+|final[[:space:]]+|sealed[[:space:]]+|data[[:space:]]+|inline[[:space:]]+|value[[:space:]]+|annotation[[:space:]]+|enum[[:space:]]+)*(class|object|interface)[[:space:]]+[A-Z][A-Za-z0-9_]*' "$FILE_PATH" 2>/dev/null | \
+            grep -vE '^[[:space:]]*(private|internal|protected)' | \
+            sed -E 's/^(public[[:space:]]+)?(abstract[[:space:]]+|open[[:space:]]+|final[[:space:]]+|sealed[[:space:]]+|data[[:space:]]+|inline[[:space:]]+|value[[:space:]]+|annotation[[:space:]]+|enum[[:space:]]+)*(class|object|interface)[[:space:]]+([A-Z][A-Za-z0-9_]*).*/\4/' | sort -u || true)
+        FUNCS=$(grep -E '^fun[[:space:]]+[a-zA-Z_][A-Za-z0-9_]*[[:space:]]*\(' "$FILE_PATH" 2>/dev/null | \
+            sed -E 's/^fun[[:space:]]+([a-zA-Z_][A-Za-z0-9_]*).*/\1/' | sort -u || true)
+        SYMBOLS=$(printf '%s\n%s\n' "$CLASSES" "$FUNCS" | grep -v '^$' | sort -u || true)
+        ;;
 esac
 
 [ -z "$SYMBOLS" ] && exit 0
@@ -76,6 +89,8 @@ for sym in $SYMBOLS; do
     # Skip common symbol names that are usually trait impls / infrastructure
     case "$sym" in
         new|default|clone|drop|from|into|serialize|deserialize|main|init|__init__|String|Error|Result|Config) continue ;;
+        # kotlin-android infrastructure / framework-managed names
+        Companion|invoke|Color|Theme|Type|Typography|Shapes|R|BuildConfig) continue ;;
     esac
 
     FOUND=0

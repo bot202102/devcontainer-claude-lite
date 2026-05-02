@@ -579,6 +579,125 @@ rg 'public (class|interface|enum)' src/main/java -n
 ### Archivos
 - `.claude/hooks/lang/java.sh` — checker
 
+## Kotlin-Android
+
+### Por qué un checker separado de `java`
+
+Aunque `java.sh` puede escanear `.kt` files (la heurística `public class` también
+matchea Kotlin), Android viola tres asunciones del modelo Java estándar:
+
+1. **Visibilidad por defecto invertida**: Kotlin classes son public por default
+   (sin keyword); el grep `public (class|interface|enum)` de `java.sh` se pierde
+   90% de las clases. Hay que invertir la lógica: aceptar todas las clases y
+   rechazar las explícitamente `private`/`internal`/`protected`.
+2. **Multi-entry-point**: Una app Android no tiene un solo `main()`. Tiene
+   `MainActivity` (manifest-declared), `Application` class (manifest-declared),
+   `BroadcastReceiver`/`Service`/`Provider` (manifest-declared), y un grafo de
+   navegación Compose top-level (típicamente `MyApp.kt` con un `NavHost`). El
+   `java.sh` con un `ENTRY_POINTS` único no captura todo este wiring.
+3. **DI por convención (Koin)**: clases que el grafo nunca importa
+   directamente — `viewModel { FooViewModel() }`, `single { FooRepository() }` —
+   están wireadas vía DSL en archivos bajo `core/di/`. El checker tiene que
+   tratar cualquier `.kt` con patrón `module {` como reachability source.
+
+`kotlin-android.sh` resuelve los tres puntos: scan column-0 con visibilidad
+invertida, ENTRY_POINTS multi-archivo, auto-discovery de Koin DSL files.
+
+### Mecanismo
+
+```bash
+# 1. Definidores: app/src/main/java/**/*.kt, excluyendo test/androidTest/build
+find "$SCAN_ROOT" -type f -name '*.kt' \
+    | grep -vE '(/src/test/|/src/androidTest/|/build/|Test\.kt$|Tests\.kt$|Spec\.kt$|TestKoin\.kt$)'
+
+# 2. Extraer top-level public symbols (column 0, no leading whitespace).
+#    Class-like (public por default — solo rechazar private/internal/protected):
+#       (data|sealed|abstract|open|inline|value|annotation|enum)? (class|object|interface) Name
+#    Top-level fun:
+#       fun name(...)
+#    Receiver fun (top-level fun on a type):
+#       fun Foo.bar(...)
+awk '
+    /^[[:space:]]*(private|internal|protected)[[:space:]]/ { next }
+    /^(public[[:space:]]+)?...(class|object|interface)[[:space:]]+[A-Z]/ { extract symbol }
+    /^fun[[:space:]]+[a-zA-Z_]/ { extract symbol }
+'
+
+# 3. Reachability sources (in priority order):
+#    a. ENTRY_POINTS verbatim files
+#    b. AndroidManifest.xml (manifest-declared components)
+#    c. Files matching Koin DSL pattern (auto-discovered)
+#    d. Fallback: any production .kt under SCAN_ROOT, excluding the defining file
+
+# 4. Per-symbol: grep -wF on (a)+(b)+(c) fast-path; if not found, grep -rwlF over (d).
+#    Symbol is a ghost if no match anywhere.
+```
+
+### Entry-point auto-detección
+
+`install.sh kotlin-android` busca:
+- `app/src/main/java/**/MainActivity.kt` (cualquier subdirectorio)
+- `app/src/main/java/**/*Application.kt` (Application class)
+- `app/src/main/java/**/*App.kt` que NO sea `*Application.kt` (top-level Compose graph composable)
+
+Para proyectos no estándar, edita `project.conf` después del install. El
+campo `MANIFEST_PATH` default es `app/src/main/AndroidManifest.xml` y se puede
+override.
+
+### Skip-list
+
+Generic Kotlin/Android infrastructure que produce noise sin señal:
+- `R`, `BuildConfig` (generated)
+- `Companion`, `invoke` (operator fn names)
+- `Color`, `Theme`, `Type`, `Typography`, `Shapes` (Compose theme conventions)
+- Tipos primitivos: `String`, `Int`, `Long`, etc. (rare false positives via top-level extension fns)
+
+Project-specific names (Application class, NavGraph) NO van en la skip-list —
+van en `ENTRY_POINTS`, donde se exentan por archivo en lugar de por nombre.
+
+### Limitaciones específicas
+
+- **Reflection / Class.forName(...)**: el checker no resuelve strings
+  dinámicos. Si tu código hace `Class.forName("$BuildConfig.APPLICATION_ID.MainActivity")`,
+  el simple-name `MainActivity` puede o no aparecer textualmente en el código.
+  En la práctica, casi siempre aparece — es un edge case raro.
+- **kotlinx-serialization polymorphic discriminators**: si tienes
+  `polymorphic { subclass(Foo::class) }` en un `SerializersModule`, `Foo` se
+  cuenta como reachable (el módulo lo menciona). OK.
+- **@Composable `@Preview` functions**: el checker NO distingue `@Composable`
+  con/sin `@Preview`. Una `@Preview` es por convención dev-only — pero su
+  existencia hace que un componente sin caller real luzca "wired" si la
+  preview está en el mismo archivo y se llama sí misma. **Mitigación**: el
+  checker excluye self-mentions (file-defining-symbol) explícitamente; un
+  Preview en el mismo archivo NO cuenta como reachable.
+- **Dynamic feature modules**: el scan default es `app/src/main/java`. Si
+  usas dynamic feature modules con `feature/src/main/java`, override
+  `SRC_GLOBS` o múltiples scan roots (no soportado nativamente — adapta el
+  checker).
+
+### Validado contra
+
+Drivox CRM Android (production app, repo: bot202102/Drivox):
+- 604 archivos `.kt` en `app/src/main/java/`
+- 8 Koin module files bajo `core/di/`
+- 3 entry-points: `MainActivity.kt`, `MoytrixApp.kt`, `MoytrixApplication.kt`
+- 48 ghosts heredados en baseline inicial (incluye Night Ledger parallel-unapplied
+  theme components, exception classes used via Java reflection, DTOs accedidos
+  vía kotlinx-serialization sin nombre explícito)
+- Tiempo de baseline run: 7.5s
+- Tiempo de Stop hook (incremental, ~5 nuevos symbols): ~0.5s
+
+### Entry-point candidates
+
+- `app/src/main/java/com/example/app/MainActivity.kt` (single Activity con Compose)
+- `app/src/main/java/com/example/app/MyApplication.kt` (Application class — registra Koin modules)
+- `app/src/main/java/com/example/app/MyApp.kt` (top-level `@Composable fun MyApp()` con NavHost)
+- Optionally: archivos de `BroadcastReceiver` críticos si tu lógica de wakeup vive ahí
+
+### Archivos
+
+- `.claude/hooks/lang/kotlin-android.sh` — checker
+
 ## Agregar soporte para un lenguaje nuevo
 
 1. Crea `.claude/hooks/lang/<lang>.sh` siguiendo el contrato arriba

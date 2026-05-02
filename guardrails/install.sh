@@ -7,11 +7,20 @@
 # project.conf with the specified lang, initializes ghost-baseline.txt,
 # and appends the Definition of Done to <target>/CLAUDE.md.
 #
-# langs: rust | python | node | astro | go | java
+# langs: rust | python | node | astro | nextjs | go | java | kotlin-android
 #
 # `astro` is a specialization of `node` for Astro projects: it treats every
 # file under src/pages/ plus src/middleware.ts and astro.config.{mjs,ts,js}
 # as an implicit entry-point (file-based routing has no single `main`).
+#
+# `kotlin-android` is a specialization for Android Kotlin projects: it
+# treats your Application class + MainActivity + top-level NavGraph as
+# multi-entry-points, auto-discovers Koin module DSL files (`module {`)
+# as additional reachability sources, and consults AndroidManifest.xml for
+# manifest-declared Service / Receiver / Provider symbols. Use this for
+# Android-specific projects; for server-side or KMP Kotlin without
+# Android conventions, the `java` checker (which scans .kt + .java) or a
+# new `kotlin` checker is more appropriate.
 #
 # Idempotent-ish: re-running overwrites hook scripts (so updates propagate)
 # but preserves project.conf and ghost-baseline.txt if they exist.
@@ -24,7 +33,7 @@ LANG="${2:-}"
 
 if [ -z "$TARGET" ] || [ -z "$LANG" ]; then
     echo "Usage: $0 <target-project-dir> <lang>" >&2
-    echo "  langs: rust | python | node | astro | go | java" >&2
+    echo "  langs: rust | python | node | astro | nextjs | go | java | kotlin-android" >&2
     exit 1
 fi
 
@@ -34,10 +43,10 @@ if [ ! -d "$TARGET" ]; then
 fi
 
 case "$LANG" in
-    rust|python|node|astro|nextjs|go|java) ;;
+    rust|python|node|astro|nextjs|go|java|kotlin-android) ;;
     *)
         echo "Unsupported language: $LANG" >&2
-        echo "Supported: rust | python | node | astro | nextjs | go | java" >&2
+        echo "Supported: rust | python | node | astro | nextjs | go | java | kotlin-android" >&2
         exit 1
         ;;
 esac
@@ -120,6 +129,17 @@ if [ ! -f ".claude/hooks/project.conf" ]; then
         java)
             EP=$(find src/main/java -name '*.java' -exec grep -l 'public static void main' {} \; 2>/dev/null | head -1)
             EP="${EP:-src/main/java/App.java}"
+            ;;
+        kotlin-android)
+            # Android entry-points: MainActivity + Application class + top-level
+            # Compose graph composable. Auto-discover MainActivity; the user
+            # should review and add their Application class + nav graph file.
+            MAIN_ACTIVITY=$(find app/src/main/java -name 'MainActivity.kt' 2>/dev/null | head -1)
+            APP_CLASS=$(find app/src/main/java -name '*Application.kt' 2>/dev/null | head -1)
+            APP_GRAPH=$(find app/src/main/java -name '*App.kt' -not -name '*Application.kt' 2>/dev/null | head -1)
+            EP="${MAIN_ACTIVITY:-app/src/main/java/MainActivity.kt}"
+            [ -n "$APP_CLASS" ] && EP="$EP $APP_CLASS"
+            [ -n "$APP_GRAPH" ] && EP="$EP $APP_GRAPH"
             ;;
     esac
 
