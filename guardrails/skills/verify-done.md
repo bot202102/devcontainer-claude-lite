@@ -23,6 +23,8 @@ Invoke BEFORE any of these outputs:
 
 If none of the above apply, you don't need this skill. Doing a refactor, exploring, reading code — skip it.
 
+The complementary `surfacing-fakework` skill runs continuously during ANY work — not at a checkpoint. If you notice fakework while executing a task (empty handler, stub response, exported symbol with no caller), file a GitHub issue immediately and keep working. `verify-done` runs at the done-claim gate; `surfacing-fakework` runs the moment you see something wrong.
+
 ## How to invoke
 
 1. Read `.claude/hooks/project.conf` to get `LANG` and `ENTRY_POINTS` (required).
@@ -72,7 +74,7 @@ PASS if the feature is referenced AND the response is not `{}`, `{"note": "..."}
 > Some production file references the symbol.
 
 ```bash
-grep -r "\b$SYM\b" <src-dirs> --include='*.<ext>' \
+grep -r "$SYM" <src-dirs> --include='*.<ext>' \
   | grep -v -E '(__tests__|\.test\.|\.spec\.|/tests?/|/lab/|/examples/)' \
   | wc -l
 ```
