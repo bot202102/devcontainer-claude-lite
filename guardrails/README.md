@@ -99,7 +99,12 @@ guardrails/
 │   ├── DEFINITION_OF_DONE.md    # Bloque para pegar en CLAUDE.md
 │   └── LANG_MATRIX.md           # Cómo funciona el checker por lenguaje
 ├── skills/
-│   └── verify-done.md           # Capa 0b — skill de self-check con evidencia
+│   ├── verify-done.md           # Capa 0b — done-claim gate (self-check con evidencia)
+│   ├── verify-contract.md       # cross-layer schema drift
+│   ├── verify-storage.md        # storage write/read continuity
+│   ├── verify-identity.md       # ID stability
+│   ├── verify-honest-failure.md # observable error signals
+│   └── surfacing-fakework.md   # inflight discovery — file immediately, keep moving
 └── .claude/
     ├── settings.json            # Hooks registration (merge con el tuyo)
     └── hooks/
@@ -201,7 +206,12 @@ Los archivos finales viven en el proyecto target:
 - [docs/FAKE_WORK_AUDIT.md](docs/FAKE_WORK_AUDIT.md) — Caso real que motivó este template (evidencia, métricas, anti-patterns)
 - [docs/DEFINITION_OF_DONE.md](docs/DEFINITION_OF_DONE.md) — Bloque listo para pegar en `CLAUDE.md`
 - [docs/LANG_MATRIX.md](docs/LANG_MATRIX.md) — Detalle de cada checker por lenguaje
-- [skills/verify-done.md](skills/verify-done.md) — Capa 0b: self-check declarativo con evidencia real
+- [skills/verify-done.md](skills/verify-done.md) — Capa 0b: done-claim gate (self-check declarativo con evidencia real)
+- [skills/verify-contract.md](skills/verify-contract.md) — cross-layer schema drift
+- [skills/verify-storage.md](skills/verify-storage.md) — storage write/read continuity
+- [skills/verify-identity.md](skills/verify-identity.md) — ID stability
+- [skills/verify-honest-failure.md](skills/verify-honest-failure.md) — observable error signals
+- [skills/surfacing-fakework.md](skills/surfacing-fakework.md) — inflight discovery: file the issue, keep moving
 - [install.sh](install.sh) — Instalador universal
 - Claude Code hooks reference: https://docs.claude.com/en/docs/claude-code/hooks
 - Claude Code settings reference: https://docs.claude.com/en/docs/claude-code/settings
