@@ -12,6 +12,7 @@ Claude escribe todo el codigo. ESLint, Prettier y formatOnSave son CPU desperdic
 |---|---|---|---|
 | Node.js | `node/` | `node:22-slim` | pnpm (corepack), Node 22, Chromium (MCP) |
 | Python | `python/` | `python:3.12-slim` | uv, Python 3.12, sqlite3, Node 22 (para Claude Code), Chromium (MCP) |
+| Python+Rust | `python-rust/` | `python:3.13-slim` | uv, Python 3.13, rustup stable + clippy + rustfmt + rust-analyzer, ffmpeg + libsndfile + libsox, Node 22 (para Claude Code), Chromium (MCP) |
 
 ## Integration gates — anti "fake-work" para Claude Code
 

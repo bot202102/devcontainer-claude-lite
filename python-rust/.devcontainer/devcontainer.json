@@ -1,0 +1,70 @@
+{
+  "name": "Python+Rust",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+  "userEnvProbe": "none",
+  "initializeCommand": "bash .devcontainer/initialize.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "ms-python.python",
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "serayuzgur.crates"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.profiles.linux": {
+          "zsh": {
+            "path": "zsh"
+          }
+        },
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.languageServer": "None",
+        "rust-analyzer.check.command": "clippy",
+        "rust-analyzer.check.extraArgs": ["--", "-D", "warnings"],
+        "editor.formatOnSave": false,
+        "editor.codeActionsOnSave": {},
+        "files.eol": "\n",
+        "files.exclude": {
+          "**/__pycache__": true,
+          "**/*.pyc": true,
+          "**/.pytest_cache": true,
+          "**/.mypy_cache": true,
+          "**/.ruff_cache": true,
+          "**/target": true
+        },
+        "files.watcherExclude": {
+          "**/__pycache__/**": true,
+          "**/.git/objects/**": true,
+          "**/.git/subtree-cache/**": true,
+          "**/.mypy_cache/**": true,
+          "**/.ruff_cache/**": true,
+          "**/.pytest_cache/**": true,
+          "**/target/**": true,
+          "**/data/**": true
+        },
+        "search.exclude": {
+          "**/__pycache__": true,
+          "**/.mypy_cache": true,
+          "**/.ruff_cache": true,
+          "**/.pytest_cache": true,
+          "**/target": true,
+          "**/data": true
+        }
+      }
+    }
+  },
+  "remoteUser": "dev",
+  "containerEnv": {
+    "PYTHONUNBUFFERED": "1",
+    "ENVIRONMENT": "development",
+    "SHELL": "/bin/zsh",
+    "CLAUDE_CONFIG_DIR": "/home/dev/.claude"
+  },
+  "postCreateCommand": "test -f python/pyproject.toml && (cd python && sudo uv pip install --system -e .) || (test -f requirements.txt && sudo uv pip install --system -r requirements.txt) || echo 'No Python deps to install'",
+  "postStartCommand": "bash .devcontainer/post-start.sh"
+}
