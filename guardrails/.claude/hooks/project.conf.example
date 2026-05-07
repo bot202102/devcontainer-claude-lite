@@ -43,8 +43,12 @@ ENTRY_POINTS="src/main.rs"
 
 # Optional — override file glob for symbol extraction.
 # Default varies by LANG (see lang/*.sh).
-# Each lang checker interprets this differently; for `node` it is a directory
-# (single root) — e.g. `apps/web/src` for a monorepo.
+# Each lang checker interprets this differently; for `node` and `nextjs` it
+# is a directory (single root) — e.g. `apps/web/src` for a monorepo, or
+# `.` for a Next.js project that keeps `app/`, `lib/`, `components/`
+# directly at the repo root (no top-level `src/`). With `SRC_GLOBS="."` the
+# nextjs checker still excludes `node_modules`, `.next`, and tests via
+# its built-in EXCLUDE_RE; use TEST_EXCLUDES for additional substrings.
 # SRC_GLOBS="crates/*/src/**/*.rs"
 
 # Optional — extra patterns to exclude beyond the language defaults.
