@@ -9,6 +9,9 @@
 # Edit/Write. Purpose: feedback loop so Claude can wire immediately, not
 # wait until end of turn.
 #
+# Multi-lang: when project.conf sets LANGS=…, dispatches by file extension
+# via lang_for_file() helper. Single-lang LANG=… path unchanged.
+#
 # Always exits 0 (warning only, never blocks a tool call).
 # Reads Claude's tool-call JSON from stdin to extract the edited file path.
 
@@ -22,8 +25,6 @@ CONF="$HOOKS_DIR/project.conf"
 set -a
 source "$CONF"
 set +a
-[ -z "${LANG:-}" ] && exit 0
-[ -z "${ENTRY_POINTS:-}" ] && exit 0
 
 # Parse tool-call input (stdin) to get the file path.
 # Claude Code sends a JSON payload like:
@@ -31,16 +32,57 @@ set +a
 INPUT=$(cat || true)
 FILE_PATH=$(echo "$INPUT" | grep -oE '"file_path"\s*:\s*"[^"]*"' | head -1 | sed 's/.*"file_path"\s*:\s*"\(.*\)"/\1/' || true)
 
-# If no file path extracted or not a source file, silent pass
+# If no file path extracted, silent pass.
 [ -z "$FILE_PATH" ] && exit 0
 
-# Only check source files of the configured language
-case "$LANG" in
+# Helper: file extension → lang name. Empty if no known mapping.
+lang_for_file() {
+    local f="$1"
+    case "$f" in
+        *.rs)                  echo "rust" ;;
+        *.py)                  echo "python" ;;
+        *.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs)
+                               echo "node" ;;   # may resolve to nextjs below
+        *.go)                  echo "go" ;;
+        *.java)                echo "java" ;;
+        *.kt)                  echo "kotlin-android" ;;  # may resolve to java below
+        *)                     echo "" ;;
+    esac
+}
+
+# Resolve which lang this edit belongs to.
+if [ -n "${LANGS:-}" ]; then
+    DETECTED=$(lang_for_file "$FILE_PATH")
+    [ -z "$DETECTED" ] && exit 0
+    # Resolve overlapping pairs: nextjs accepts node's extensions; java accepts kotlin's.
+    case " $LANGS " in
+        *" nextjs "*)         [ "$DETECTED" = "node" ] && DETECTED="nextjs" ;;
+    esac
+    case " $LANGS " in
+        *" java "*)           [ "$DETECTED" = "kotlin-android" ] && DETECTED="java" ;;
+    esac
+    case " $LANGS " in
+        *" $DETECTED "*) ;;
+        *) exit 0 ;;
+    esac
+    EFF_LANG="$DETECTED"
+    EP_VAR="ENTRY_POINTS_${EFF_LANG//-/_}"
+    EFF_EP="${!EP_VAR:-}"
+    [ -z "$EFF_EP" ] && exit 0
+elif [ -n "${LANG:-}" ] && [ -n "${ENTRY_POINTS:-}" ]; then
+    EFF_LANG="$LANG"
+    EFF_EP="$ENTRY_POINTS"
+else
+    exit 0
+fi
+
+# Filter by extension for the resolved lang.
+case "$EFF_LANG" in
     rust)            case "$FILE_PATH" in *.rs) ;; *) exit 0 ;; esac ;;
     python)          case "$FILE_PATH" in *.py) ;; *) exit 0 ;; esac ;;
     node|nextjs)     case "$FILE_PATH" in *.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs) ;; *) exit 0 ;; esac ;;
     go)              case "$FILE_PATH" in *.go) ;; *) exit 0 ;; esac ;;
-    java)            case "$FILE_PATH" in *.java) ;; *) exit 0 ;; esac ;;
+    java)            case "$FILE_PATH" in *.java|*.kt) ;; *) exit 0 ;; esac ;;
     kotlin-android)  case "$FILE_PATH" in *.kt) ;; *) exit 0 ;; esac ;;
 esac
 
@@ -51,7 +93,7 @@ case "$FILE_PATH" in
 esac
 
 # Extract public symbols from the edited file (heuristic — cheap)
-case "$LANG" in
+case "$EFF_LANG" in
     rust)
         SYMBOLS=$(grep -oE '^pub (fn|struct|enum|trait) [A-Za-z_][A-Za-z0-9_]*' "$FILE_PATH" 2>/dev/null | awk '{print $3}' | sort -u || true)
         ;;
@@ -83,7 +125,7 @@ esac
 
 [ -z "$SYMBOLS" ] && exit 0
 
-# Check each symbol against ENTRY_POINTS
+# Check each symbol against the resolved entry-points.
 MISSING_SYMBOLS=""
 for sym in $SYMBOLS; do
     # Skip common symbol names that are usually trait impls / infrastructure
@@ -94,7 +136,7 @@ for sym in $SYMBOLS; do
     esac
 
     FOUND=0
-    for ep in $ENTRY_POINTS; do
+    for ep in $EFF_EP; do
         if [ -f "$ep" ] && grep -q "\b$sym\b" "$ep" 2>/dev/null; then
             FOUND=1
             break
@@ -111,7 +153,7 @@ MISSING_SYMBOLS=$(echo "$MISSING_SYMBOLS" | tr -s ' ')
 if [ -n "$MISSING_SYMBOLS" ]; then
     # Warning only — non-blocking (exit 0). Claude sees this as context.
     echo ""
-    echo "⚠️  new-symbol-guard: $FILE_PATH introduced public symbol(s) with no obvious call-site in $ENTRY_POINTS:"
+    echo "⚠️  new-symbol-guard: $FILE_PATH introduced public symbol(s) with no obvious call-site in $EFF_EP:"
     for sym in $MISSING_SYMBOLS; do
         echo "   - $sym"
     done
