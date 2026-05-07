@@ -162,6 +162,21 @@ if [ ! -f ".claude/hooks/project.conf" ]; then
             done
             EP_RS="${EP_RS:-rust/src/main.rs}"
 
+            # SRC_GLOBS: derive from entry-point's top-level directory.
+            # python: "python" if EP_PY starts with python/; else "src" if it starts with src/; else empty (lets checker auto-detect).
+            case "$EP_PY" in
+                python/*) SG_PY="python" ;;
+                src/*)    SG_PY="src" ;;
+                *)        SG_PY="" ;;
+            esac
+            # rust: "rust/crates" if EP_RS in rust/crates/; "rust" if rust/; "crates" if crates/; else empty.
+            case "$EP_RS" in
+                rust/crates/*) SG_RS="rust/crates" ;;
+                rust/*)        SG_RS="rust" ;;
+                crates/*)      SG_RS="crates" ;;
+                *)             SG_RS="" ;;
+            esac
+
             EP="$EP_PY (python) + $EP_RS (rust)"  # display only; written below as separate vars
             ;;
     esac
@@ -175,10 +190,11 @@ LANGS="python rust"
 ENTRY_POINTS_python="$EP_PY"
 ENTRY_POINTS_rust="$EP_RS"
 
-# Per-lang SRC_GLOBS / TEST_EXCLUDES / GHOST_SKIP_NAMES override the
-# global ones if set. Example:
-# SRC_GLOBS_python="python"
-# SRC_GLOBS_rust="rust/crates"
+# SRC_GLOBS auto-derived from layout. Override here if your sources live
+# elsewhere. The hooks fall back to global SRC_GLOBS / TEST_EXCLUDES /
+# GHOST_SKIP_NAMES if the per-lang variant is unset.
+SRC_GLOBS_python="$SG_PY"
+SRC_GLOBS_rust="$SG_RS"
 EOF
     else
         cat > .claude/hooks/project.conf <<EOF
@@ -209,13 +225,19 @@ if [ ! -f ".claude/ghost-baseline.txt" ]; then
     source .claude/hooks/project.conf
     set +a
     if [ "$LANG" = "python-rust" ]; then
-        # Run each lang's checker with its ENTRY_POINTS_<lang>; prefix lang:.
-        # Also normalize file:line:symbol → file:symbol (drops middle field).
+        # Run each lang's checker with its ENTRY_POINTS_<lang> + SRC_GLOBS_<lang>;
+        # prefix output with lang:. Also normalize file:line:symbol → file:symbol.
         TMP_BASE=$(mktemp)
-        ENTRY_POINTS="${ENTRY_POINTS_python:-}" bash .claude/hooks/lang/python.sh 2>/dev/null \
+        ENTRY_POINTS="${ENTRY_POINTS_python:-}" \
+        SRC_GLOBS="${SRC_GLOBS_python:-${SRC_GLOBS:-}}" \
+        TEST_EXCLUDES="${TEST_EXCLUDES_python:-${TEST_EXCLUDES:-}}" \
+            bash .claude/hooks/lang/python.sh 2>/dev/null \
             | awk -F: -v OFS=: '{ sym=$3; for(i=4;i<=NF;i++) sym=sym":"$i; print "python:" $1 ":" sym }' \
             >> "$TMP_BASE" || true
-        ENTRY_POINTS="${ENTRY_POINTS_rust:-}" bash .claude/hooks/lang/rust.sh 2>/dev/null \
+        ENTRY_POINTS="${ENTRY_POINTS_rust:-}" \
+        SRC_GLOBS="${SRC_GLOBS_rust:-${SRC_GLOBS:-}}" \
+        TEST_EXCLUDES="${TEST_EXCLUDES_rust:-${TEST_EXCLUDES:-}}" \
+            bash .claude/hooks/lang/rust.sh 2>/dev/null \
             | awk -F: -v OFS=: '{ sym=$3; for(i=4;i<=NF;i++) sym=sym":"$i; print "rust:" $1 ":" sym }' \
             >> "$TMP_BASE" || true
         sort -u "$TMP_BASE" > .claude/ghost-baseline.txt
