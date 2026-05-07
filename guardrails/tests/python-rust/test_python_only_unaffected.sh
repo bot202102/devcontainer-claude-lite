@@ -57,15 +57,31 @@ if [ ! -f .claude/ghost-baseline.txt ]; then
     exit 1
 fi
 
-# Assert format: every line is exactly file:symbol (no 'python:' prefix).
+# Negative: no 'python:' prefix anywhere (would mean multi-lang format leaked into single-lang).
 if grep -qE '^python:' .claude/ghost-baseline.txt; then
     echo "FAIL: single-lang baseline has 'python:' prefix (regression — should be file:symbol)" >&2
     cat .claude/ghost-baseline.txt >&2
     exit 1
 fi
 
+# Positive: every row must be exactly 2 colon-separated fields (file:symbol).
+# Catches regression to legacy 3-field 'file:line:symbol' format.
+if ! awk -F: 'NF != 2 { exit 1 }' .claude/ghost-baseline.txt; then
+    echo "FAIL: baseline rows are not exactly 2 fields (file:symbol). Likely regression to file:line:symbol legacy format." >&2
+    cat .claude/ghost-baseline.txt >&2
+    exit 1
+fi
+
+# Cardinality: fixture defines exactly one ghost (lonely_ghost in pkg/ghost.py).
+LINE_COUNT=$(wc -l < .claude/ghost-baseline.txt | tr -d ' ')
+if [ "$LINE_COUNT" != "1" ]; then
+    echo "FAIL: expected exactly 1 baseline row (fixture has 1 ghost), got $LINE_COUNT" >&2
+    cat .claude/ghost-baseline.txt >&2
+    exit 1
+fi
+
 if ! grep -q "lonely_ghost" .claude/ghost-baseline.txt; then
-    echo "FAIL: ghost not captured in baseline" >&2
+    echo "FAIL: ghost 'lonely_ghost' not captured in baseline" >&2
     cat .claude/ghost-baseline.txt >&2
     exit 1
 fi
