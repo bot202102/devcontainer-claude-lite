@@ -1,0 +1,169 @@
+# =============================================================================
+# Docker Compose for Python+Rust hybrid devcontainer
+# =============================================================================
+# Usage:
+#   1. Default: builds the app service from .devcontainer/Dockerfile and runs
+#      the container in workspace bind-mount mode.
+#   2. To enable additional services (postgres, redis, qdrant, etc.) uncomment
+#      the relevant block below + the matching `depends_on:` and `environment:`
+#      entries in the `app` service.
+#
+# Or use standalone (without devcontainer integration):
+#   docker compose -f .devcontainer/docker-compose.yml up -d
+#
+# IMPORTANT: Dev Containers features break COPY in Dockerfiles (the CLI
+# overrides the build context). Python deps are installed via postCreateCommand
+# for the app service. Rust deps via postCreateCommand or on-demand cargo build.
+# Worker services must install deps at startup — see the worker example below.
+#
+# PORT CONFLICTS: If you run multiple devcontainers simultaneously, use unique
+# port ranges per project via env vars in .devcontainer/.env. Example:
+#   POSTGRES_PORT=31432
+#   REDIS_PORT=31379
+# Default ports (5432, 6379, etc.) WILL conflict with other containers.
+# =============================================================================
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+      args:
+        TZ: ${TZ:-America/Lima}
+        CLAUDE_CODE_VERSION: latest
+    volumes:
+      - ..:/workspace:cached
+      - pyrust-history:/commandhistory
+      - pyrust-claude-config:/home/dev/.claude
+      - pyrust-cargo-registry:/home/dev/.cargo/registry
+      - pyrust-cargo-git:/home/dev/.cargo/git
+      - pyrust-target:/workspace/rust/target
+      - pyrust-hf-cache:/home/dev/.cache/huggingface
+      - pyrust-torch-cache:/home/dev/.cache/torch
+      - /var/run/docker.sock:/var/run/docker.sock
+    security_opt:
+      - seccomp=unconfined
+    command: sleep infinity
+    healthcheck:
+      test: ["CMD-SHELL", "getent hosts google.com > /dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    # env_file:
+    #   - ../.env
+    # depends_on:
+    #   postgres:
+    #     condition: service_healthy
+    #   redis:
+    #     condition: service_healthy
+
+  ## ---------------------------------------------------------
+  ## PostgreSQL — uncomment to enable
+  ## Use pgvector/pgvector:pg17 if your app needs vector search
+  ## ---------------------------------------------------------
+  # postgres:
+  #   image: postgres:17-alpine
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_USER: devuser
+  #     POSTGRES_PASSWORD: devpass
+  #     POSTGRES_DB: devdb
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+  #   ports:
+  #     - "${POSTGRES_PORT:-5432}:5432"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U devuser -d devdb"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 5
+
+  ## ---------------------------------------------------------
+  ## Redis — uncomment to enable
+  ## ---------------------------------------------------------
+  # redis:
+  #   image: redis:7-alpine
+  #   restart: unless-stopped
+  #   command: redis-server --requirepass devpass --maxmemory 128mb --maxmemory-policy allkeys-lru
+  #   volumes:
+  #     - redisdata:/data
+  #   ports:
+  #     - "${REDIS_PORT:-6379}:6379"
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "-a", "devpass", "ping"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 5
+
+  ## ---------------------------------------------------------
+  ## Qdrant (vector search) — uncomment to enable
+  ## NOTE: qdrant/qdrant image has NO curl/wget — healthcheck
+  ## uses bash /dev/tcp instead.
+  ## ---------------------------------------------------------
+  # qdrant:
+  #   image: qdrant/qdrant:latest
+  #   restart: unless-stopped
+  #   volumes:
+  #     - qdrantdata:/qdrant/storage
+  #   ports:
+  #     - "${QDRANT_PORT:-6333}:6333"
+  #     - "${QDRANT_GRPC_PORT:-6334}:6334"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "timeout 2 bash -c 'echo > /dev/tcp/localhost/6333' || exit 1"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 20s
+
+  ## ---------------------------------------------------------
+  ## Minio (S3-compatible storage) — uncomment to enable
+  ## ---------------------------------------------------------
+  # minio:
+  #   image: minio/minio:latest
+  #   restart: unless-stopped
+  #   command: server /data --console-address ":9001"
+  #   environment:
+  #     MINIO_ROOT_USER: minioadmin
+  #     MINIO_ROOT_PASSWORD: minioadmin
+  #   volumes:
+  #     - miniodata:/data
+  #   ports:
+  #     - "${MINIO_PORT:-9000}:9000"
+  #     - "${MINIO_CONSOLE_PORT:-9001}:9001"
+
+  ## ---------------------------------------------------------
+  ## Worker example — Python (celery / taskiq / etc.)
+  ## Dev Containers features break COPY, so deps are NOT baked into the image.
+  ## The worker installs them at startup via bash -c before running the command.
+  ## ---------------------------------------------------------
+  # worker:
+  #   build:
+  #     context: ..
+  #     dockerfile: .devcontainer/Dockerfile
+  #     args:
+  #       TZ: ${TZ:-America/Lima}
+  #   volumes:
+  #     - ..:/workspace:cached
+  #   command: bash -c "uv pip install -r requirements.txt && celery -A myapp worker --loglevel=info"
+  #   env_file:
+  #     - ../.env
+  #   environment:
+  #     PYTHONUNBUFFERED: "1"
+  #     REDIS_URL: redis://:devpass@redis:6379
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+
+volumes:
+  pyrust-history:
+  pyrust-claude-config:
+  pyrust-cargo-registry:
+  pyrust-cargo-git:
+  pyrust-target:
+  pyrust-hf-cache:
+  pyrust-torch-cache:
+  # pgdata:
+  # redisdata:
+  # qdrantdata:
+  # miniodata:
