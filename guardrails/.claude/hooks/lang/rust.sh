@@ -80,8 +80,17 @@ done < "$TMP_FILES" > "$TMP_SYMS"
 
 # For each symbol, check if it's referenced in any ENTRY_POINTS file or its
 # sibling modules (same crate src dir).
+#
+# SKIP_SELF (default 1, matching python.sh): when checking siblings, exclude
+# the file where the symbol is defined — otherwise the definition itself
+# (`pub fn foo`) matches `grep -w foo` and the symbol is incorrectly marked
+# as reachable. A symbol called only from its own file (recursion) does not
+# count as production-reachable; a real caller must live elsewhere.
+SKIP_SELF="${SKIP_SELF:-1}"
+
 while IFS= read -r line; do
     [ -z "$line" ] && continue
+    definer_file=$(echo "$line" | awk -F: '{print $1}')
     symbol=$(echo "$line" | awk -F: '{print $NF}')
 
     # Skip ubiquitous names (false-positive noise)
@@ -94,18 +103,24 @@ while IFS= read -r line; do
     found=0
     for ep in $ENTRY_POINTS; do
         [ ! -f "$ep" ] && continue
-        # Use -w (word match) — portable, doesn't need \b
-        if grep -qw "$symbol" "$ep" 2>/dev/null; then
+        # Skip the definer itself (don't count `pub fn foo` as a call to foo).
+        if [ "$SKIP_SELF" = "1" ] && [ "$ep" = "$definer_file" ]; then
+            : # fallthrough to sibling scan
+        elif grep -qw "$symbol" "$ep" 2>/dev/null; then
             found=1; break
         fi
-        # Also scan same-crate sibling .rs files
+        # Also scan same-crate sibling .rs files (excluding definer if SKIP_SELF=1).
         ep_dir=$(dirname "$ep")
-        if find "$ep_dir" -name '*.rs' -type f 2>/dev/null | while IFS= read -r f; do
+        match=$(find "$ep_dir" -name '*.rs' -type f 2>/dev/null | while IFS= read -r f; do
+            if [ "$SKIP_SELF" = "1" ] && [ "$f" = "$definer_file" ]; then
+                continue
+            fi
             if grep -qw "$symbol" "$f" 2>/dev/null; then
                 echo "1"
                 break
             fi
-        done | grep -q '1'; then
+        done)
+        if [ -n "$match" ]; then
             found=1; break
         fi
     done
