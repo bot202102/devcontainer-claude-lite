@@ -159,8 +159,16 @@ fi
 
 # 4. Initialize ghost baseline
 if [ ! -f ".claude/ghost-baseline.txt" ]; then
+    # The lang checker reads ENTRY_POINTS / SRC_GLOBS / TEST_EXCLUDES from
+    # the process environment. `source` alone sets shell-locals; the child
+    # `bash` invocation below is a separate shell and does NOT inherit
+    # locals. Without `set -a` the checker exits early with "ENTRY_POINTS
+    # env var required" and the redirect captures an empty file — the
+    # baseline silently lands at 0 ghosts regardless of project state.
+    set -a
     # shellcheck source=/dev/null
     source .claude/hooks/project.conf
+    set +a
     bash ".claude/hooks/lang/$LANG.sh" 2>/dev/null | sort -u > .claude/ghost-baseline.txt || true
     GHOST_COUNT=$(wc -l < .claude/ghost-baseline.txt | tr -d ' ')
     echo "  ✓ Captured ghost baseline ($GHOST_COUNT inherited symbols) at .claude/ghost-baseline.txt"
@@ -187,17 +195,23 @@ else
     echo "  ✓ Appended Definition of Done to CLAUDE.md"
 fi
 
-# 6. Install the verify-done skill (declarative-with-evidence layer).
+# 6. Install the verify-* skill family (declarative-with-evidence layer).
 #    Complements the mechanical hooks by letting the agent self-audit with
-#    real command output before claiming completion. See guardrails/skills/verify-done.md.
-if [ -f "$SCRIPT_DIR/skills/verify-done.md" ]; then
+#    real command output before claiming completion in five orthogonal
+#    domains: contract drift, completion claims, error paths, identity keys,
+#    and storage integrity. See guardrails/skills/*.md.
+if [ -d "$SCRIPT_DIR/skills" ]; then
     mkdir -p .claude/skills
-    if [ -f ".claude/skills/verify-done.md" ]; then
-        echo "  ⚠️  .claude/skills/verify-done.md already exists — NOT overwriting."
-    else
-        cp -f "$SCRIPT_DIR/skills/verify-done.md" .claude/skills/verify-done.md
-        echo "  ✓ Installed verify-done skill at .claude/skills/verify-done.md"
-    fi
+    for skill_path in "$SCRIPT_DIR"/skills/*.md; do
+        [ -f "$skill_path" ] || continue
+        skill_name=$(basename "$skill_path")
+        if [ -f ".claude/skills/$skill_name" ]; then
+            echo "  ⚠️  .claude/skills/$skill_name already exists — NOT overwriting."
+        else
+            cp -f "$skill_path" ".claude/skills/$skill_name"
+            echo "  ✓ Installed skill .claude/skills/$skill_name"
+        fi
+    done
 fi
 
 echo ""
