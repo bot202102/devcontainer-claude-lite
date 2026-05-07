@@ -38,7 +38,7 @@ FILE_PATH=$(echo "$INPUT" | grep -oE '"file_path"\s*:\s*"[^"]*"' | head -1 | sed
 case "$LANG" in
     rust)            case "$FILE_PATH" in *.rs) ;; *) exit 0 ;; esac ;;
     python)          case "$FILE_PATH" in *.py) ;; *) exit 0 ;; esac ;;
-    node)            case "$FILE_PATH" in *.ts|*.tsx|*.js|*.jsx) ;; *) exit 0 ;; esac ;;
+    node|nextjs)     case "$FILE_PATH" in *.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs) ;; *) exit 0 ;; esac ;;
     go)              case "$FILE_PATH" in *.go) ;; *) exit 0 ;; esac ;;
     java)            case "$FILE_PATH" in *.java) ;; *) exit 0 ;; esac ;;
     kotlin-android)  case "$FILE_PATH" in *.kt) ;; *) exit 0 ;; esac ;;
@@ -58,7 +58,7 @@ case "$LANG" in
     python)
         SYMBOLS=$(grep -oE '^(def|class|async def) [A-Za-z][A-Za-z0-9_]*' "$FILE_PATH" 2>/dev/null | awk '{print $2}' | grep -v '^_' | sort -u || true)
         ;;
-    node)
+    node|nextjs)
         SYMBOLS=$(grep -oE '^export (const|let|var|function|class|async function) [A-Za-z_][A-Za-z0-9_]*' "$FILE_PATH" 2>/dev/null | awk '{print $3}' | sort -u || true)
         ;;
     go)
