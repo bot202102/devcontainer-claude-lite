@@ -83,10 +83,12 @@ cat guardrails-docs.md >> CLAUDE.md  # o copia el bloque manualmente
 O ejecuta el one-liner:
 
 ```bash
-bash guardrails/install.sh /ruta/a/tu-proyecto rust   # o python, node, astro, nextjs, go, java
+bash guardrails/install.sh /ruta/a/tu-proyecto rust   # o python, node, astro, nextjs, go, java, kotlin-android, python-rust
 ```
 
 Ver [install.sh](install.sh) para detalle.
+
+**Multi-lang**: para repos con dos stacks activos al mismo tiempo (ej. Python + Rust), usa el meta-lang `python-rust`. Detalles en [docs/LANG_MATRIX.md §Multi-lang projects](docs/LANG_MATRIX.md#multi-lang-projects).
 
 ## Anatomía del paquete
 
