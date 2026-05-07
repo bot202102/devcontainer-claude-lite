@@ -63,3 +63,28 @@ ENTRY_POINTS="src/main.rs"
 # Optional — extra placeholder patterns to scan for in addition to the standard
 # TODO/FIXME/placeholder/DEV SKIPPED/[0u8;N] set.
 # EXTRA_GHOST_PATTERNS="unimplemented|stubbed"
+
+# ─── Multi-lang projects (optional) ───────────────────────────────────
+#
+# If your project has two stacks active simultaneously (e.g. Python + Rust
+# in the same repo), use LANGS instead of LANG. Mutually exclusive — set
+# one or the other, never both.
+#
+#   LANGS="python rust"
+#   ENTRY_POINTS_python="python/myapp/cli.py"
+#   ENTRY_POINTS_rust="rust/crates/mycrate/src/main.rs"
+#
+# Per-lang overrides for SRC_GLOBS / TEST_EXCLUDES use the same suffix
+# pattern: SRC_GLOBS_python, TEST_EXCLUDES_rust, etc. Lang names with a
+# hyphen (e.g. kotlin-android) become underscored in the variable name:
+#   ENTRY_POINTS_kotlin_android="..."
+#
+# When LANGS is set, the baseline format (.claude/ghost-baseline.txt)
+# carries a "lang:" prefix per row:
+#   python:python/myapp/foo.py:orphan_function
+#   rust:rust/crates/mycrate/src/lib.rs:OrphanStruct
+#
+# See guardrails/docs/LANG_MATRIX.md §Multi-lang projects.
+# LANGS="python rust"
+# ENTRY_POINTS_python="python/myapp/cli.py"
+# ENTRY_POINTS_rust="rust/crates/mycrate/src/main.rs"
