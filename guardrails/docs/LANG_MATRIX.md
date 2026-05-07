@@ -716,3 +716,78 @@ Drivox CRM Android (production app, repo: bot202102/Drivox):
 - Cómo funcionan los hooks de Claude Code: https://docs.claude.com/en/docs/claude-code/hooks
 - Exit codes en hooks: `exit 2` → feedback a Claude, bloquea operación
 - Settings file: https://docs.claude.com/en/docs/claude-code/settings
+
+---
+
+## Multi-lang projects
+
+When a single repo has two stacks active simultaneously (e.g. Python + Rust), use `LANGS` instead of `LANG`. Mutually exclusive — set one or the other, never both.
+
+### `project.conf`
+
+```bash
+LANGS="python rust"
+ENTRY_POINTS_python="python/myapp/cli.py"
+ENTRY_POINTS_rust="rust/crates/mycrate/src/main.rs"
+
+# Per-lang overrides for SRC_GLOBS / TEST_EXCLUDES / GHOST_SKIP_NAMES
+# use the same suffix pattern. Hyphens in lang names → underscores.
+SRC_GLOBS_python="python"
+SRC_GLOBS_rust="rust/crates"
+# TEST_EXCLUDES_kotlin_android="..."
+```
+
+### Baseline format under LANGS
+
+`.claude/ghost-baseline.txt` carries a `lang:` prefix on every row:
+
+```
+python:python/myapp/foo.py:orphan_function
+rust:rust/crates/mycrate/src/lib.rs:OrphanStruct
+```
+
+A multi-lang run against a legacy 2-field baseline (`file:symbol` without prefix) refuses with an actionable rebuild message rather than guessing — re-run the install or `rm .claude/ghost-baseline.txt` and re-capture.
+
+### How each hook iterates
+
+| Hook | Behavior under LANGS |
+|---|---|
+| `ghost-report.sh` (SessionStart) | Runs each lang's checker with its `ENTRY_POINTS_<lang>`; merges output sorted with `lang:` prefixes. |
+| `integration-gate.sh` (Stop) | Same iteration; new ghosts in ANY lang trigger `exit 2`. |
+| `new-symbol-guard.sh` (PostToolUse) | Uses `lang_for_file()` helper to pick the lang based on the edited file's extension; only warns if the resolved lang is in `LANGS`. |
+
+### Overlapping lang pairs
+
+Two lang pairs share file extensions:
+- `node` and `nextjs` both consume `.ts/.tsx/.js/.jsx/.mjs/.cjs`. If both are in `LANGS`, **`nextjs`** wins (more specific).
+- `java` and `kotlin-android` both consume `.kt`. If both are in `LANGS`, **`java`** wins (more general server-side).
+
+### Installing via meta-lang
+
+`install.sh` supports `python-rust` as a shortcut for the most common pairing:
+
+```bash
+bash guardrails/install.sh /path/to/your-project python-rust
+```
+
+This installs both `python.sh` and `rust.sh` checkers, writes `project.conf` with `LANGS="python rust"` plus auto-derived `SRC_GLOBS_python` / `SRC_GLOBS_rust`, and captures the initial baseline with prefixes.
+
+For other combinations (e.g. `python go`, `node rust`), invoke `install.sh` once per lang then hand-edit `project.conf` to merge into a single `LANGS=…` entry.
+
+### Backwards compatibility
+
+| Existing config | Behavior after multi-lang feature |
+|---|---|
+| `LANG="rust"` + `ENTRY_POINTS=…` | Identical — `LANGS` not set, falls back to single-lang path. |
+| `LANG="python"` + `ENTRY_POINTS=…` | Identical. |
+| `LANG="kotlin-android"` with multi-EP `ENTRY_POINTS=…` | Identical (multi-EP within a single LANG already worked). |
+| Pre-existing `ghost-baseline.txt` in `file:line:symbol` format | Auto-migrated to `file:symbol` on next gate run, same as before. |
+
+The `tests/python-rust/test_python_only_unaffected.sh` test fixture asserts this invariant.
+
+### Risks and edge cases
+
+- **Bash variable indirection (`${!VAR}`)** is used to read `ENTRY_POINTS_<lang>` dynamically. Requires bash 4+; the devcontainer base (Debian 12 / 13) ships bash 5.x. Will not work on `/bin/sh` POSIX-only shells.
+- **Hyphen in lang name** (`kotlin-android`): bash variables can't contain `-`. The hooks normalize to underscores (`ENTRY_POINTS_kotlin_android`) before lookup.
+- **Per-lang variable fallback**: when `SRC_GLOBS_<lang>` / `TEST_EXCLUDES_<lang>` / `GHOST_SKIP_NAMES_<lang>` are unset, the hook falls back to the global (unprefixed) variable, which falls back to the lang checker's auto-detect default.
+- **`SKIP_SELF=1` in `rust.sh`** (multi-lang motivation): rust.sh's sibling-tree caller scan now excludes the file where a `pub fn` is defined to avoid the definition itself matching `grep -w`. Same default as `python.sh`. Set `SKIP_SELF=0` to restore the (looser, false-positive-prone) prior behavior.
