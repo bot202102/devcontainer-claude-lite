@@ -3,10 +3,9 @@ FROM python:3.13-slim
 ARG TZ
 ENV TZ="$TZ"
 
-# Essential system tools + audio libs + Chromium + Playwright deps
-# Build essentials: native compilation (cpal, ALSA, Pillow, etc.)
-# Audio libs: ffmpeg + libsndfile + libsox-fmt-all for pydub / symphonia / soundfile
-# Chromium: full browser for Chrome DevTools MCP (browser automation, screenshots)
+# Essential system tools + native build deps + Chromium + Playwright deps.
+# Build essentials: native compilation for crates / wheels (cpal, ALSA, Pillow, ring, etc.)
+# Chromium: full browser for Chrome DevTools MCP (browser automation, screenshots).
 RUN apt-get update && apt-get install -y --no-install-recommends \
   less \
   git \
@@ -22,9 +21,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   build-essential \
   libssl-dev \
   libasound2-dev \
-  ffmpeg \
-  libsndfile1 \
-  libsox-fmt-all \
   chromium \
   libnss3 \
   libatk1.0-0 \
@@ -44,6 +40,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libxshmfence1 \
   fonts-liberation \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# OPTIONAL: audio processing libs (ffmpeg, libsndfile1, libsox-fmt-all).
+# Adds ~85 MB to the image. Uncomment the RUN block below if your project
+# uses pydub / soundfile / symphonia / sox. The first consumer
+# (audio-a-texto) needs them; generic Python+Rust projects don't.
+#
+# RUN apt-get update && apt-get install -y --no-install-recommends \
+#   ffmpeg \
+#   libsndfile1 \
+#   libsox-fmt-all \
+#   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Node.js 22 (Claude Code requires modern Node)
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \

@@ -8,9 +8,9 @@ Hybrid Python + Rust devcontainer template. Use when your project has (or will h
 |---|---|
 | Python | 3.13-slim, uv, ruff (via setup-hooks) |
 | Rust | rustup stable + clippy + rustfmt + rust-analyzer |
-| Audio | ffmpeg, libsndfile1, libsox-fmt-all, libasound2-dev |
-| Native build | pkg-config, libssl-dev, build-essential |
+| Native build | pkg-config, libssl-dev, libasound2-dev, build-essential |
 | Web (optional) | Chromium (Chrome DevTools MCP), Node 22 |
+| Audio (opt-in) | ffmpeg, libsndfile1, libsox-fmt-all — uncomment the OPTIONAL `RUN` block in `Dockerfile` to enable |
 | Dev infra | Docker CLI via host socket, zsh + persistent history, Claude Code |
 | Caches (volumes) | cargo registry/git, cargo target, HF_HOME, TORCH_HOME |
 
@@ -21,6 +21,10 @@ Hybrid Python + Rust devcontainer template. Use when your project has (or will h
 - **`node/`** — Node only.
 
 Don't pick `python-rust/` "just in case". The Rust toolchain costs ~600 MB of image size and a handful of extra apt packages.
+
+### If you process audio
+
+Uncomment the `OPTIONAL: audio processing libs` block in `Dockerfile` (~85 MB extra). Adds `ffmpeg`, `libsndfile1`, and `libsox-fmt-all` for `pydub` / `soundfile` / `symphonia` / `sox` consumers. The first consumer of this template (`bot202102/audio-a-texto`) does this; most other Python+Rust projects do not need it.
 
 ## Layout convention
 
