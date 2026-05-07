@@ -10,6 +10,10 @@
 #   1 — setup error (bad config, missing lang checker) — warns, does not block
 #   2 — new ghosts detected — blocks Stop, Claude receives stderr as feedback
 #
+# Multi-lang: when project.conf sets LANGS="python rust", iterates per-lang
+# and stores baseline rows as `lang:file:symbol`. Single-lang LANG=… path
+# unchanged (baseline stays `file:symbol`).
+#
 # DO NOT modify this script to always `exit 0`. The `exit 2` is the point.
 
 set -euo pipefail
@@ -29,66 +33,129 @@ set -a
 source "$CONF"
 set +a
 
-if [ -z "${LANG:-}" ] || [ -z "${ENTRY_POINTS:-}" ]; then
-    echo "⚠️  integration-gate.sh: project.conf missing LANG or ENTRY_POINTS." >&2
+# Build (lang, EP) pairs (mirrors ghost-report.sh).
+PAIRS_LANGS=""
+PAIRS_EPS=""
+if [ -n "${LANGS:-}" ]; then
+    for L in $LANGS; do
+        VAR="ENTRY_POINTS_${L//-/_}"
+        EP="${!VAR:-}"
+        if [ -z "$EP" ]; then
+            echo "⚠️  integration-gate.sh: LANGS contains '$L' but $VAR is unset in project.conf." >&2
+            exit 1
+        fi
+        PAIRS_LANGS="$PAIRS_LANGS $L"
+        PAIRS_EPS="$PAIRS_EPS|$EP"
+    done
+elif [ -n "${LANG:-}" ] && [ -n "${ENTRY_POINTS:-}" ]; then
+    PAIRS_LANGS="$LANG"
+    PAIRS_EPS="|$ENTRY_POINTS"
+else
+    echo "⚠️  integration-gate.sh: project.conf missing LANGS or LANG+ENTRY_POINTS." >&2
     exit 1
 fi
 
-LANG_CHECKER="$HOOKS_DIR/lang/$LANG.sh"
-if [ ! -x "$LANG_CHECKER" ]; then
-    echo "⚠️  integration-gate.sh: no checker for LANG=$LANG at $LANG_CHECKER" >&2
-    echo "   Available: $(ls "$HOOKS_DIR/lang/" 2>/dev/null | tr '\n' ' ')" >&2
-    exit 1
-fi
+MULTI=0
+[ -n "${LANGS:-}" ] && MULTI=1
+
+# Verify all requested checkers exist.
+for L in $PAIRS_LANGS; do
+    CHK="$HOOKS_DIR/lang/$L.sh"
+    if [ ! -x "$CHK" ]; then
+        echo "⚠️  integration-gate.sh: no checker for LANG=$L at $CHK" >&2
+        echo "   Available: $(ls "$HOOKS_DIR/lang/" 2>/dev/null | tr '\n' ' ')" >&2
+        exit 1
+    fi
+done
 
 CURRENT=$(mktemp)
 CURRENT_NORM=$(mktemp)
 BASELINE_NORM=$(mktemp)
 trap 'rm -f "$CURRENT" "$CURRENT_NORM" "$BASELINE_NORM"' EXIT
 
-bash "$LANG_CHECKER" | sort -u > "$CURRENT" || true
+# Run each checker, accumulating raw output (file:line:symbol) into CURRENT.
+# In MULTI mode we prepend "lang:" to each line so downstream normalization
+# uses ":" as separator without ambiguity.
+IDX=0
+set -- $PAIRS_LANGS
+for L in "$@"; do
+    IDX=$((IDX + 1))
+    EP=$(echo "$PAIRS_EPS" | awk -F'|' -v idx=$((IDX + 1)) '{ print $idx }')
+    PER_VAR_SRC="SRC_GLOBS_${L//-/_}"
+    PER_VAR_TEST="TEST_EXCLUDES_${L//-/_}"
+    PER_VAR_SKIP="GHOST_SKIP_NAMES_${L//-/_}"
 
-# ─── Baseline format: `file:symbol` (symbol-based, line-independent) ──
-#
-# Rationale: the previous format `file:line:symbol` was brittle — adding
-# an `import` at the top of a file shifted every subsequent line number
-# and produced N bogus "new ghost" alerts even when the symbols were
-# unchanged. The new format keys ghosts by file+symbol identity, so
-# line shifts are invisible to the diff.
-#
-# Output to the user still shows `file:line:symbol` — we keep the line
-# for navigation. Only the BASELINE stores the line-independent form.
+    CHECKER_OUT=$(
+        ENTRY_POINTS="$EP" \
+        SRC_GLOBS="${!PER_VAR_SRC:-${SRC_GLOBS:-}}" \
+        TEST_EXCLUDES="${!PER_VAR_TEST:-${TEST_EXCLUDES:-}}" \
+        GHOST_SKIP_NAMES="${!PER_VAR_SKIP:-${GHOST_SKIP_NAMES:-}}" \
+        bash "$HOOKS_DIR/lang/$L.sh" 2>/dev/null || true
+    )
 
-# Normalize CURRENT (file:line:symbol) to file:symbol (drop middle field).
-# Robust to rare colons in symbol names via awk OFS reconstruction.
-awk -F: -v OFS=: '{
-    # Join fields 1 (file) and the rest-after-field-2 (symbol, which may
-    # itself contain colons in pathological cases).
-    file = $1
-    sym = $3
-    for (i = 4; i <= NF; i++) sym = sym ":" $i
-    print file ":" sym
-}' "$CURRENT" | sort -u > "$CURRENT_NORM"
+    if [ "$MULTI" = "1" ]; then
+        echo "$CHECKER_OUT" | sed "/^$/d; s/^/$L:/" >> "$CURRENT"
+    else
+        echo "$CHECKER_OUT" | sed "/^$/d" >> "$CURRENT"
+    fi
+done
 
-# If no baseline exists, create it (first run) in the new symbol-based format.
+sort -u -o "$CURRENT" "$CURRENT"
+
+EP_DISPLAY="${ENTRY_POINTS:-multi-lang ($PAIRS_LANGS)}"
+
+# ─── Normalize CURRENT to baseline form ───────────────────────────────
+#   single-lang: file:line:symbol  → file:symbol
+#   multi-lang:  lang:file:line:symbol → lang:file:symbol
+awk -F: -v OFS=: -v multi="$MULTI" '
+{
+    if (multi == "1") {
+        lang = $1
+        file = $2
+        sym = $4
+        for (i = 5; i <= NF; i++) sym = sym ":" $i
+        print lang ":" file ":" sym
+    } else {
+        file = $1
+        sym = $3
+        for (i = 4; i <= NF; i++) sym = sym ":" $i
+        print file ":" sym
+    }
+}
+' "$CURRENT" | sort -u > "$CURRENT_NORM"
+
+# ─── Baseline init / migration / multi-lang validation ────────────────
+# If no baseline exists, create it (first run).
 if [ ! -f "$BASELINE" ]; then
     cp "$CURRENT_NORM" "$BASELINE"
-    echo "integration-gate.sh: baseline created at $BASELINE ($(wc -l < "$BASELINE") inherited ghosts, symbol-based). Review + commit in a follow-up PR." >&2
+    echo "integration-gate.sh: baseline created at $BASELINE ($(wc -l < "$BASELINE") inherited ghosts). Review + commit in a follow-up PR." >&2
     exit 0
 fi
 
-# ─── Auto-migrate legacy baseline (file:line:symbol → file:symbol) ────
-# Detect format: lines with exactly 2 colons (`path:123:Name`) are legacy.
-# We tolerate a mixed file too (some already migrated), migrating only the
-# legacy rows on the fly.
-if grep -qE '^[^:]+:[0-9]+:[^:]+$' "$BASELINE" 2>/dev/null; then
+if [ "$MULTI" = "1" ]; then
+    # Multi-lang baseline format: lang:file:symbol. Refuse if existing
+    # baseline lacks a recognizable lang prefix (legacy single-lang format
+    # is ambiguous when multiple langs share file paths).
+    FIRST=$(grep -v '^#' "$BASELINE" 2>/dev/null | grep -v '^$' | head -1 || true)
+    if [ -n "$FIRST" ]; then
+        FIRST_LANG=${FIRST%%:*}
+        case " $PAIRS_LANGS " in
+            *" $FIRST_LANG "*) ;;  # OK
+            *)
+                echo "⚠️  integration-gate.sh: baseline at $BASELINE has no recognizable 'lang:' prefix" >&2
+                echo "   for current LANGS=\"$PAIRS_LANGS\". Refusing to auto-migrate (the legacy" >&2
+                echo "   format file:symbol is ambiguous when multiple langs share file paths)." >&2
+                echo "   Recreate it: rm $BASELINE && re-run guardrails install or your gate." >&2
+                exit 1
+                ;;
+        esac
+    fi
+elif grep -qE '^[^:]+:[0-9]+:[^:]+$' "$BASELINE" 2>/dev/null; then
+    # Legacy file:line:symbol → file:symbol auto-migration (single-lang only).
     TMP_MIGRATED=$(mktemp)
     awk -F: '
-        # Legacy row: file:line:symbol  (3 fields, field 2 is digits)
         NF == 3 && $2 ~ /^[0-9]+$/ { print $1 ":" $3; next }
-        # Already migrated: file:symbol  (2 fields)
         NF == 2 { print $0; next }
-        # Other rows: keep verbatim (comments, blank lines)
         { print }
     ' "$BASELINE" | sort -u > "$TMP_MIGRATED"
     mv "$TMP_MIGRATED" "$BASELINE"
@@ -101,20 +168,27 @@ sort -u "$BASELINE" > "$BASELINE_NORM"
 NEW_KEYS=$(comm -23 "$CURRENT_NORM" "$BASELINE_NORM" || true)
 
 if [ -n "$NEW_KEYS" ]; then
-    # For each new key `file:symbol`, recover its `file:line:symbol` from
-    # CURRENT so the user sees a navigable reference.
+    # For each new key, recover the navigable file:line:symbol from CURRENT.
     NEW_GHOSTS=$(echo "$NEW_KEYS" | while IFS= read -r key; do
         [ -z "$key" ] && continue
-        file="${key%:*}"
-        sym="${key##*:}"
-        # Match `file:<digits>:<sym>` in CURRENT
-        grep -E "^${file}:[0-9]+:${sym}\$" "$CURRENT" 2>/dev/null || echo "$key"
+        if [ "$MULTI" = "1" ]; then
+            # key = lang:file:symbol → match lang:file:<digits>:symbol in CURRENT
+            lang_prefix="${key%%:*}"
+            rest="${key#*:}"
+            file="${rest%:*}"
+            sym="${rest##*:}"
+            grep -E "^${lang_prefix}:${file}:[0-9]+:${sym}\$" "$CURRENT" 2>/dev/null || echo "$key"
+        else
+            file="${key%:*}"
+            sym="${key##*:}"
+            grep -E "^${file}:[0-9]+:${sym}\$" "$CURRENT" 2>/dev/null || echo "$key"
+        fi
     done)
-    echo "INTEGRATION GATE BLOCK: new public symbols have no call-site reachable from $ENTRY_POINTS." >&2
+    echo "INTEGRATION GATE BLOCK: new public symbols have no call-site reachable from $EP_DISPLAY." >&2
     echo "" >&2
     echo "$NEW_GHOSTS" | sed 's/^/  /' >&2
     echo "" >&2
-    echo "Default action (proceed WITHOUT consulting the user): for each symbol above, add a call-site from $ENTRY_POINTS (preferred — the feature must actually run) or delete it if dead." >&2
+    echo "Default action (proceed WITHOUT consulting the user): for each symbol above, add a call-site from $EP_DISPLAY (preferred — the feature must actually run) or delete it if dead." >&2
     echo "Appending to $BASELINE is a last-resort escape hatch reserved for intentional exceptions that a PR reviewer will validate; do not use it to close this turn quickly." >&2
     echo "Context: guardrails/docs/FAKE_WORK_AUDIT.md." >&2
     exit 2
