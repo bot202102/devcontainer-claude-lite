@@ -142,6 +142,7 @@ Code returns `[]` / `None` / `{success: False, ...}` followed by neither raise, 
 - **Skill drafts**: in `/tmp/skill_drafts/` (this session); landing as PR to upstream.
 - **CLAUDE.md updates**: both `expediente-processor/CLAUDE.md` and `leyia/CLAUDE.md` now have a "Workflow — ownership and deploy" section explaining `owner:prod` / `owner:dev`.
 - **Memory** (Claude's own persistent memory): the 4 patterns + prod/dev workflow + LeyIA architecture saved as memory entries for future sessions.
+- **Upstream follow-up skill**: `guardrails/skills/surfacing-fakework.md` — added in a later PR as the inflight counterpart to the 4 checkpoint skills above. Codifies the practice of filing a GitHub issue the moment you notice fakework during any task, rather than waiting for a formal audit gate. The LeyIA session demonstrated this discipline (53 issues filed in one day); the skill document preserves it as reusable guidance.
 
 ## What was NOT preserved (and why)
 
